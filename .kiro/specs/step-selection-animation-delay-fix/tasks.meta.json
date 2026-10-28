@@ -1,0 +1,120 @@
+{
+  "pbtResults": {
+    "1. Write bug condition exploration test": {
+      "status": "passed",
+      "failingExample": "La prueba de exploración FALLA sobre el código SIN arreglar (resultado esperado: confirma el bug). Contraejemplos, todos en aserción SÍNCRONA tras el clic con POST /api/alumno/pasos en vuelo:\n- Marcar \"Paso uno\": aria-pressed sigue \"false\", sin clase animate-pop, contador sigue \"0/2\" (esperado aria-pressed \"true\", animate-pop, \"1/2\").\n- Desmarcar \"Paso uno\" (ya completado): aria-pressed sigue \"true\" (esperado \"false\").\n- Marcar el último paso pendiente: contador sigue \"0/1\" (esperado \"1/1\"); barra de XP sigue \"Llevas 0 de 10...\" y la mascota sigue en \"Completa tus pasos...\" en vez de \"Terminaste todos tus pasos...\".\n- Edge case POST falla: aria-pressed sigue \"false\" tras el clic -> nunca hubo cambio optimista, por lo tanto no hay reversión que observar.\nCausa confirmada: toggleStep no aplica actualización optimista; el feedback visual (palomita/CheckCircle2, animate-pop, contador, XP, mascota) está acoplado al viaje completo POST + load().",
+      "lastRunTimestamp": 1792741683318
+    }
+  },
+  "executionHistory": {
+    "1. Write bug condition exploration test": [
+      {
+        "executionId": "4af2e108-0da0-4b8b-b331-3357e42c404c",
+        "chatSessionId": "sess_21623044-9702-4c50-95e0-c1bd7839d509",
+        "timestamp": 1792741528840
+      },
+      {
+        "executionId": "4af2e108-0da0-4b8b-b331-3357e42c404c",
+        "chatSessionId": "sess_21623044-9702-4c50-95e0-c1bd7839d509",
+        "timestamp": 1792741535884
+      },
+      {
+        "executionId": "4af2e108-0da0-4b8b-b331-3357e42c404c",
+        "chatSessionId": "sess_21623044-9702-4c50-95e0-c1bd7839d509",
+        "timestamp": 1792741713709
+      }
+    ],
+    "2. Write preservation property tests (BEFORE implementing fix)": [
+      {
+        "executionId": "4af2e108-0da0-4b8b-b331-3357e42c404c",
+        "chatSessionId": "sess_21623044-9702-4c50-95e0-c1bd7839d509",
+        "timestamp": 1792741528976
+      },
+      {
+        "executionId": "4af2e108-0da0-4b8b-b331-3357e42c404c",
+        "chatSessionId": "sess_21623044-9702-4c50-95e0-c1bd7839d509",
+        "timestamp": 1792741717825
+      },
+      {
+        "executionId": "4af2e108-0da0-4b8b-b331-3357e42c404c",
+        "chatSessionId": "sess_21623044-9702-4c50-95e0-c1bd7839d509",
+        "timestamp": 1792741870098
+      }
+    ],
+    "3.1 Implement the fix": [
+      {
+        "executionId": "4af2e108-0da0-4b8b-b331-3357e42c404c",
+        "chatSessionId": "sess_21623044-9702-4c50-95e0-c1bd7839d509",
+        "timestamp": 1792741529051
+      },
+      {
+        "executionId": "4af2e108-0da0-4b8b-b331-3357e42c404c",
+        "chatSessionId": "sess_21623044-9702-4c50-95e0-c1bd7839d509",
+        "timestamp": 1792741873707
+      },
+      {
+        "executionId": "4af2e108-0da0-4b8b-b331-3357e42c404c",
+        "chatSessionId": "sess_21623044-9702-4c50-95e0-c1bd7839d509",
+        "timestamp": 1792741939429
+      }
+    ],
+    "3.2 Verify bug condition exploration test now passes": [
+      {
+        "executionId": "4af2e108-0da0-4b8b-b331-3357e42c404c",
+        "chatSessionId": "sess_21623044-9702-4c50-95e0-c1bd7839d509",
+        "timestamp": 1792741529185
+      },
+      {
+        "executionId": "4af2e108-0da0-4b8b-b331-3357e42c404c",
+        "chatSessionId": "sess_21623044-9702-4c50-95e0-c1bd7839d509",
+        "timestamp": 1792741942718
+      },
+      {
+        "executionId": "4af2e108-0da0-4b8b-b331-3357e42c404c",
+        "chatSessionId": "sess_21623044-9702-4c50-95e0-c1bd7839d509",
+        "timestamp": 1792742062408
+      }
+    ],
+    "3.3 Verify preservation tests still pass": [
+      {
+        "executionId": "4af2e108-0da0-4b8b-b331-3357e42c404c",
+        "chatSessionId": "sess_21623044-9702-4c50-95e0-c1bd7839d509",
+        "timestamp": 1792741529259
+      },
+      {
+        "executionId": "4af2e108-0da0-4b8b-b331-3357e42c404c",
+        "chatSessionId": "sess_21623044-9702-4c50-95e0-c1bd7839d509",
+        "timestamp": 1792742065697
+      },
+      {
+        "executionId": "4af2e108-0da0-4b8b-b331-3357e42c404c",
+        "chatSessionId": "sess_21623044-9702-4c50-95e0-c1bd7839d509",
+        "timestamp": 1792742109545
+      }
+    ],
+    "4. Checkpoint - Ensure all tests pass": [
+      {
+        "executionId": "4af2e108-0da0-4b8b-b331-3357e42c404c",
+        "chatSessionId": "sess_21623044-9702-4c50-95e0-c1bd7839d509",
+        "timestamp": 1792741529329
+      },
+      {
+        "executionId": "4af2e108-0da0-4b8b-b331-3357e42c404c",
+        "chatSessionId": "sess_21623044-9702-4c50-95e0-c1bd7839d509",
+        "timestamp": 1792742113175
+      },
+      {
+        "executionId": "4af2e108-0da0-4b8b-b331-3357e42c404c",
+        "chatSessionId": "sess_21623044-9702-4c50-95e0-c1bd7839d509",
+        "timestamp": 1792742207995
+      }
+    ],
+    "3. Fix for retraso de feedback al seleccionar un paso (actualización optimista en `toggleStep`)": [
+      {
+        "executionId": "4af2e108-0da0-4b8b-b331-3357e42c404c",
+        "chatSessionId": "sess_21623044-9702-4c50-95e0-c1bd7839d509",
+        "timestamp": 1792742109688
+      }
+    ]
+  }
+}
