@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { AlumnosCargaMasiva } from "@/components/admin/alumnos-carga-masiva";
 
-type Tab = "maestros" | "grupos" | "jurado";
+type Tab = "maestros" | "grupos" | "jurado" | "alumnos";
 
 type Teacher = {
   id: string;
@@ -35,7 +36,8 @@ type CreatedCredential = {
 const TABS: Array<{ id: Tab; label: string }> = [
   { id: "maestros", label: "Maestros" },
   { id: "grupos", label: "Grupos" },
-  { id: "jurado", label: "Jurado" }
+  { id: "jurado", label: "Jurado" },
+  { id: "alumnos", label: "Alumnos (carga masiva)" }
 ];
 
 export function UsuariosManager() {
@@ -63,6 +65,7 @@ export function UsuariosManager() {
       {tab === "maestros" && <MaestrosPanel />}
       {tab === "grupos" && <GruposPanel />}
       {tab === "jurado" && <JuradoPanel />}
+      {tab === "alumnos" && <AlumnosCargaMasiva />}
     </div>
   );
 }

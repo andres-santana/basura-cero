@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { KeyRound, Loader2 } from "lucide-react";
 import { getErrorMessage } from "@/lib/error-message";
@@ -12,35 +12,47 @@ function AccessFormInner() {
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Evita auto-enviar mas de una vez si el componente se re-renderiza.
+  const autoSubmitted = useRef(false);
 
+  const submitCode = useCallback(
+    async (rawCode: string) => {
+      setError(null);
+      if (rawCode.trim().length < 4) {
+        setError("Escribe tu codigo completo");
+        return;
+      }
+      setLoading(true);
+      try {
+        const res = await fetch("/api/alumno/acceso", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code: rawCode })
+        });
+        const payload = await res.json();
+        if (!res.ok) throw new Error(payload.error ?? "No pudimos entrar");
+        router.push("/alumno/reto");
+        router.refresh();
+      } catch (err) {
+        setError(getErrorMessage(err));
+      } finally {
+        setLoading(false);
+      }
+    },
+    [router]
+  );
+
+  // Pre-llena desde el QR (?codigo=ABC-123) y entra automaticamente.
   useEffect(() => {
     const prefill = searchParams.get("codigo");
-    if (prefill) setCode(prefill.toUpperCase());
-  }, [searchParams]);
+    if (!prefill || autoSubmitted.current) return;
+    autoSubmitted.current = true;
+    const normalized = prefill.toUpperCase();
+    setCode(normalized);
+    void submitCode(normalized);
+  }, [searchParams, submitCode]);
 
-  const enter = async () => {
-    setError(null);
-    if (code.trim().length < 4) {
-      setError("Escribe tu codigo completo");
-      return;
-    }
-    setLoading(true);
-    try {
-      const res = await fetch("/api/alumno/acceso", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code })
-      });
-      const payload = await res.json();
-      if (!res.ok) throw new Error(payload.error ?? "No pudimos entrar");
-      router.push("/alumno/reto");
-      router.refresh();
-    } catch (err) {
-      setError(getErrorMessage(err));
-    } finally {
-      setLoading(false);
-    }
-  };
+  const enter = () => submitCode(code);
 
   return (
     <div className="mx-auto max-w-md rounded-3xl border-4 border-emerald-200 bg-white p-8 text-center shadow-sm">
