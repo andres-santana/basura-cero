@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
 
 type SubmissionStatus = "draft" | "submitted" | "approved" | "rejected";
 
@@ -165,14 +164,11 @@ export function TeacherReviewQueue() {
         <p className="mt-1 text-sm text-slate-600">
           Se arman automaticamente con lo que suben los alumnos. Aqui ves el total
           del grupo y puedes aprobarlo o rechazarlo. Para aprobar/rechazar la foto
-          de un alumno o corregir sus kilos uno por uno, ve a{" "}
-          <Link
-            href="/dashboard/maestro/alumnos"
-            className="font-semibold text-emerald-700 underline"
-          >
-            Mis alumnos
-          </Link>
-          .
+          de un alumno o corregir sus kilos uno por uno, usa la seccion{" "}
+          <span className="font-semibold text-emerald-700">
+            Evidencias de alumnos
+          </span>{" "}
+          de abajo.
         </p>
       </div>
 

@@ -1,6 +1,5 @@
 import { RoleGuard } from "@/components/auth/role-guard";
 import { StudentManager } from "@/components/students/student-manager";
-import { StudentEvidenceReview } from "@/components/students/student-evidence-review";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +15,6 @@ export default function TeacherStudentsPage() {
           </p>
         </header>
         <StudentManager />
-        <StudentEvidenceReview />
       </div>
     </RoleGuard>
   );
