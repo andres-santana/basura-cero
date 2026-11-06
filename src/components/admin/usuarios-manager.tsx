@@ -45,6 +45,7 @@ export function UsuariosManager() {
 
   return (
     <div className="space-y-4">
+      <SeguridadPanel />
       <div className="flex flex-wrap gap-2 border-b border-slate-200">
         {TABS.map((t) => (
           <button
@@ -70,20 +71,107 @@ export function UsuariosManager() {
   );
 }
 
+function SeguridadPanel() {
+  const [requirePasswordChange, setRequirePasswordChange] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    const res = await fetch("/api/admin/configuracion", { cache: "no-store" });
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setError(payload.error ?? "No se pudo cargar la configuracion");
+    } else {
+      setRequirePasswordChange(payload.data?.requirePasswordChange === true);
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const toggle = async () => {
+    const next = !requirePasswordChange;
+    setSaving(true);
+    setError(null);
+    const res = await fetch("/api/admin/configuracion", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ requirePasswordChange: next })
+    });
+    const payload = await res.json().catch(() => ({}));
+    setSaving(false);
+    if (!res.ok) {
+      setError(payload.error ?? "No se pudo actualizar la configuracion");
+      return;
+    }
+    setRequirePasswordChange(next);
+  };
+
+  return (
+    <div className="rounded-xl border bg-white p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="max-w-xl">
+          <h2 className="text-sm font-semibold text-slate-700">
+            Cambio de contrasena en el primer ingreso
+          </h2>
+          <p className="mt-1 text-sm text-slate-600">
+            Si esta activo, los maestros y el jurado creados desde aqui deberan
+            elegir una contrasena nueva la primera vez que inicien sesion. Para
+            esta etapa se recomienda dejarlo desactivado.
+          </p>
+          <ErrorBanner message={error} />
+        </div>
+        <button
+          type="button"
+          onClick={toggle}
+          disabled={loading || saving}
+          role="switch"
+          aria-checked={requirePasswordChange}
+          aria-label="Cambio de contrasena obligatorio en el primer ingreso"
+          className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition disabled:opacity-60 ${
+            requirePasswordChange ? "bg-emerald-600" : "bg-slate-300"
+          }`}
+        >
+          <span
+            className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${
+              requirePasswordChange ? "translate-x-6" : "translate-x-1"
+            }`}
+          />
+        </button>
+      </div>
+      <p className="mt-2 text-xs font-medium text-slate-500">
+        {loading
+          ? "Cargando..."
+          : saving
+            ? "Guardando..."
+            : requirePasswordChange
+              ? "Activado: se exigira el cambio en el primer ingreso."
+              : "Desactivado: no se exige cambio en el primer ingreso."}
+      </p>
+    </div>
+  );
+}
+
 function CredentialCallout({
   credential,
-  onDismiss
+  onDismiss,
+  title = "Usuario creado",
+  description = "Entrega estas credenciales al usuario. Guardalas ahora: por seguridad no se vuelven a mostrar."
 }: {
   credential: CreatedCredential;
   onDismiss: () => void;
+  title?: string;
+  description?: string;
 }) {
   return (
     <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm">
-      <p className="font-semibold text-emerald-800">Usuario creado</p>
-      <p className="mt-1 text-emerald-900">
-        Entrega estas credenciales temporales una sola vez. En el primer ingreso
-        el usuario debera elegir una contrasena personal antes de acceder al panel.
-      </p>
+      <p className="font-semibold text-emerald-800">{title}</p>
+      <p className="mt-1 text-emerald-900">{description}</p>
       <dl className="mt-3 grid gap-1 sm:grid-cols-[120px_1fr]">
         <dt className="text-emerald-700">Correo</dt>
         <dd className="font-mono text-slate-800">{credential.email}</dd>
@@ -116,6 +204,10 @@ function MaestrosPanel() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [credential, setCredential] = useState<CreatedCredential | null>(null);
+  const [credentialKind, setCredentialKind] = useState<"created" | "reset">(
+    "created"
+  );
+  const [resettingId, setResettingId] = useState<string | null>(null);
   const [form, setForm] = useState({ email: "", fullName: "", password: "" });
 
   const load = useCallback(async () => {
@@ -154,6 +246,7 @@ function MaestrosPanel() {
       setError(payload.error ?? "No se pudo crear el maestro");
       return;
     }
+    setCredentialKind("created");
     setCredential({
       email: payload.email,
       temporaryPassword: payload.temporaryPassword
@@ -177,12 +270,50 @@ function MaestrosPanel() {
     await load();
   };
 
+  const resetPassword = async (teacher: Teacher) => {
+    if (
+      !confirm(
+        `Generar una nueva contrasena para "${teacher.fullName}"? La contrasena actual dejara de funcionar.`
+      )
+    ) {
+      return;
+    }
+    setError(null);
+    setResettingId(teacher.id);
+    const res = await fetch(`/api/admin/usuarios/maestros/${teacher.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ resetPassword: true })
+    });
+    const payload = await res.json().catch(() => ({}));
+    setResettingId(null);
+    if (!res.ok) {
+      setError(payload.error ?? "No se pudo restablecer la contrasena");
+      return;
+    }
+    setCredentialKind("reset");
+    setCredential({
+      email: teacher.email ?? "",
+      temporaryPassword: payload.temporaryPassword
+    });
+  };
+
   return (
     <div className="space-y-4">
       {credential && (
         <CredentialCallout
           credential={credential}
           onDismiss={() => setCredential(null)}
+          title={
+            credentialKind === "reset"
+              ? "Contrasena restablecida"
+              : "Maestro creado"
+          }
+          description={
+            credentialKind === "reset"
+              ? "Entrega esta nueva contrasena al maestro. Guardala ahora: por seguridad no se vuelve a mostrar."
+              : "Entrega estas credenciales al maestro. Guardalas ahora: por seguridad no se vuelven a mostrar."
+          }
         />
       )}
       <ErrorBanner message={error} />
@@ -285,13 +416,25 @@ function MaestrosPanel() {
                   </span>
                 </td>
                 <td className="px-3 py-2">
-                  <button
-                    type="button"
-                    onClick={() => toggleActive(t)}
-                    className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50"
-                  >
-                    {t.isActive ? "Desactivar" : "Activar"}
-                  </button>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => toggleActive(t)}
+                      className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50"
+                    >
+                      {t.isActive ? "Desactivar" : "Activar"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => resetPassword(t)}
+                      disabled={resettingId === t.id}
+                      className="rounded border border-emerald-300 px-2 py-1 text-xs text-emerald-700 hover:bg-emerald-50 disabled:opacity-60"
+                    >
+                      {resettingId === t.id
+                        ? "Generando..."
+                        : "Restablecer contrasena"}
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -505,6 +648,10 @@ function JuradoPanel() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [credential, setCredential] = useState<CreatedCredential | null>(null);
+  const [credentialKind, setCredentialKind] = useState<"created" | "reset">(
+    "created"
+  );
+  const [resettingId, setResettingId] = useState<string | null>(null);
   const [form, setForm] = useState({ email: "", password: "" });
 
   const load = useCallback(async () => {
@@ -539,6 +686,7 @@ function JuradoPanel() {
       setError(payload.error ?? "No se pudo crear el jurado");
       return;
     }
+    setCredentialKind("created");
     setCredential({
       email: payload.email,
       temporaryPassword: payload.temporaryPassword
@@ -562,12 +710,50 @@ function JuradoPanel() {
     await load();
   };
 
+  const resetPassword = async (jury: Jury) => {
+    if (
+      !confirm(
+        `Generar una nueva contrasena para "${jury.email}"? La contrasena actual dejara de funcionar.`
+      )
+    ) {
+      return;
+    }
+    setError(null);
+    setResettingId(jury.id);
+    const res = await fetch(`/api/admin/usuarios/jurado/${jury.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ resetPassword: true })
+    });
+    const payload = await res.json().catch(() => ({}));
+    setResettingId(null);
+    if (!res.ok) {
+      setError(payload.error ?? "No se pudo restablecer la contrasena");
+      return;
+    }
+    setCredentialKind("reset");
+    setCredential({
+      email: jury.email,
+      temporaryPassword: payload.temporaryPassword
+    });
+  };
+
   return (
     <div className="space-y-4">
       {credential && (
         <CredentialCallout
           credential={credential}
           onDismiss={() => setCredential(null)}
+          title={
+            credentialKind === "reset"
+              ? "Contrasena restablecida"
+              : "Jurado creado"
+          }
+          description={
+            credentialKind === "reset"
+              ? "Entrega esta nueva contrasena al jurado. Guardala ahora: por seguridad no se vuelve a mostrar."
+              : "Entrega estas credenciales al jurado. Guardalas ahora: por seguridad no se vuelven a mostrar."
+          }
         />
       )}
       <ErrorBanner message={error} />
@@ -651,13 +837,25 @@ function JuradoPanel() {
                   </span>
                 </td>
                 <td className="px-3 py-2">
-                  <button
-                    type="button"
-                    onClick={() => toggleActive(j)}
-                    className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50"
-                  >
-                    {j.isActive ? "Desactivar" : "Activar"}
-                  </button>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => toggleActive(j)}
+                      className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50"
+                    >
+                      {j.isActive ? "Desactivar" : "Activar"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => resetPassword(j)}
+                      disabled={resettingId === j.id}
+                      className="rounded border border-emerald-300 px-2 py-1 text-xs text-emerald-700 hover:bg-emerald-50 disabled:opacity-60"
+                    >
+                      {resettingId === j.id
+                        ? "Generando..."
+                        : "Restablecer contrasena"}
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}

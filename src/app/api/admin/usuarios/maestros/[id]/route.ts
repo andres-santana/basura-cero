@@ -1,11 +1,22 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { jsonError, requireAdminWithSchool } from "@/lib/auth-admin";
+import {
+  generateTempPassword,
+  jsonError,
+  requireAdminWithSchool
+} from "@/lib/auth-admin";
 import { createServerSupabase } from "@/lib/supabase/server";
 
-const patchSchema = z.object({
-  isActive: z.boolean()
-});
+const patchSchema = z
+  .object({
+    isActive: z.boolean().optional(),
+    resetPassword: z.boolean().optional(),
+    password: z.string().min(8).optional()
+  })
+  .refine(
+    (data) => data.isActive !== undefined || data.resetPassword === true,
+    { message: "Nada que actualizar" }
+  );
 
 export async function PATCH(
   request: Request,
@@ -17,7 +28,10 @@ export async function PATCH(
     const json = await request.json();
     const parsed = patchSchema.safeParse(json);
     if (!parsed.success) {
-      return NextResponse.json({ error: "Datos invalidos" }, { status: 400 });
+      return NextResponse.json(
+        { error: parsed.error.errors[0]?.message ?? "Datos invalidos" },
+        { status: 400 }
+      );
     }
 
     const supabase = createServerSupabase();
@@ -33,14 +47,47 @@ export async function PATCH(
       return NextResponse.json({ error: "Maestro no encontrado" }, { status: 404 });
     }
 
-    const { error: updateError } = await supabase
-      .from("users")
-      .update({ is_active: parsed.data.isActive })
-      .eq("id", teacher.user_id);
+    if (parsed.data.isActive !== undefined) {
+      const { error: updateError } = await supabase
+        .from("users")
+        .update({ is_active: parsed.data.isActive })
+        .eq("id", teacher.user_id);
 
-    if (updateError) throw updateError;
+      if (updateError) throw updateError;
+    }
 
-    return NextResponse.json({ ok: true });
+    let temporaryPassword: string | undefined;
+
+    if (parsed.data.resetPassword === true) {
+      const newPassword = parsed.data.password ?? generateTempPassword();
+
+      const { error: authError } = await supabase.auth.admin.updateUserById(
+        teacher.user_id,
+        { password: newPassword }
+      );
+      if (authError) {
+        return NextResponse.json({ error: authError.message }, { status: 400 });
+      }
+
+      // Al resetear desde el admin no forzamos cambio de contrasena:
+      // la nueva contrasena entregada ya es la definitiva para el usuario.
+      const { error: profileError } = await supabase
+        .from("users")
+        .update({
+          must_change_password: false,
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", teacher.user_id);
+
+      if (profileError) throw profileError;
+
+      temporaryPassword = newPassword;
+    }
+
+    return NextResponse.json({
+      ok: true,
+      ...(temporaryPassword ? { temporaryPassword } : {})
+    });
   } catch (error) {
     return jsonError(error);
   }
