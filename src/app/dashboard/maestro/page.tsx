@@ -2,7 +2,6 @@ import Link from "next/link";
 import type { Route } from "next";
 import { RoleGuard } from "@/components/auth/role-guard";
 import { ProgressRing52Weeks } from "@/components/gamification/progress-ring-52-weeks";
-import { TeacherReviewQueue } from "@/components/evidence/teacher-review-queue";
 import { BadgeGrid } from "@/components/gamification/badge-grid";
 import { getSession } from "@/lib/auth";
 import { getCurrentChallengeForSchool } from "@/lib/services/current-challenge";
@@ -23,12 +22,20 @@ export default async function TeacherDashboardPage() {
       <div className="space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-2xl font-bold text-emerald-700">Panel de maestro</h1>
-          <Link
-            href="/dashboard/maestro/alumnos"
-            className="rounded-lg border border-emerald-300 px-3 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-50"
-          >
-            Gestionar alumnos
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href="/dashboard/maestro/alumnos"
+              className="rounded-lg border border-emerald-300 px-3 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-50"
+            >
+              Gestionar alumnos
+            </Link>
+            <Link
+              href="/dashboard/maestro/evidencias"
+              className="rounded-lg border border-emerald-300 px-3 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-50"
+            >
+              Gestionar evidencias
+            </Link>
+          </div>
         </div>
 
         {challenge ? (
@@ -88,7 +95,6 @@ export default async function TeacherDashboardPage() {
         )}
 
         <ProgressRing52Weeks completed={stats.completedWeeks} />
-        <TeacherReviewQueue />
         <section className="space-y-3">
           <h2 className="text-lg font-bold text-emerald-700">Insignias de tus grupos</h2>
           <BadgeGrid badges={stats.badges} />
