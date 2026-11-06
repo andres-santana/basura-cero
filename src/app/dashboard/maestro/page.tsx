@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import { RoleGuard } from "@/components/auth/role-guard";
 import { ProgressRing52Weeks } from "@/components/gamification/progress-ring-52-weeks";
-import { EvidenceUploader } from "@/components/evidence/evidence-uploader";
+import { TeacherReviewQueue } from "@/components/evidence/teacher-review-queue";
 import { BadgeGrid } from "@/components/gamification/badge-grid";
 import { getSession } from "@/lib/auth";
 import { getCurrentChallengeForSchool } from "@/lib/services/current-challenge";
@@ -88,7 +88,7 @@ export default async function TeacherDashboardPage() {
         )}
 
         <ProgressRing52Weeks completed={stats.completedWeeks} />
-        <EvidenceUploader />
+        <TeacherReviewQueue />
         <section className="space-y-3">
           <h2 className="text-lg font-bold text-emerald-700">Insignias de tus grupos</h2>
           <BadgeGrid badges={stats.badges} />
