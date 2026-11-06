@@ -27,7 +27,7 @@ export async function GET(request: Request) {
     let query = supabase
       .from("student_submissions")
       .select(
-        `id, comments, status, submitted_at, student_id, group_id,
+        `id, comments, status, submitted_at, student_id, group_id, kg_separated, reused_items,
          students!inner(alias, grade),
          groups!inner(name, grade, school_id, teachers(user_id)),
          weekly_challenges(experiments(week_number, title)),
@@ -65,6 +65,8 @@ export async function GET(request: Request) {
           status: row.status,
           submittedAt: row.submitted_at,
           comments: row.comments,
+          kgSeparated: Number(row.kg_separated ?? 0),
+          reusedItems: Number(row.reused_items ?? 0),
           student: { alias: student?.alias ?? "?", grade: student?.grade ?? null },
           group: { id: row.group_id, name: group?.name ?? null },
           weekNumber: experiment?.week_number ?? null,

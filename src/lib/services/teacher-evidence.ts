@@ -111,7 +111,9 @@ function aggregateStudentRows(rows: StudentSubmissionRow[]): Map<DerivedKey, Der
         latestSubmittedAt: null
       } satisfies DerivedAggregate);
 
-    const counts = row.status !== "draft";
+    // Solo cuentan las evidencias enviadas y no rechazadas: una evidencia
+    // rechazada por el maestro no suma participantes ni impacto al grupo.
+    const counts = row.status === "submitted" || row.status === "approved";
     if (counts) {
       existing.participants += 1;
       existing.kgSeparated += Number(row.kg_separated ?? 0);
@@ -322,4 +324,68 @@ function toTeacherSubmission(
     },
     filesCount: agg.filesCount
   };
+}
+
+/**
+ * Re-sincroniza la entrega de GRUPO de un (grupo, reto) a partir de las
+ * evidencias actuales de los alumnos: participantes = alumnos con evidencia
+ * enviada/aprobada (las rechazadas no cuentan), y kg/materiales = suma de esos
+ * mismos alumnos. Luego recalcula el score del grupo. Se usa cuando el maestro
+ * ajusta o rechaza la evidencia de un alumno.
+ *
+ * No sobre-escribe las metricas si el maestro ya hizo override manual sobre la
+ * entrega de grupo (status approved/rejected), para respetar su decision.
+ */
+export async function syncGroupMetricsFromStudents(
+  supabase: SupabaseClient,
+  groupId: string,
+  challengeId: string
+): Promise<void> {
+  const { data: groupSub } = await supabase
+    .from("submissions")
+    .select("id, status")
+    .eq("group_id", groupId)
+    .eq("challenge_id", challengeId)
+    .maybeSingle();
+  if (!groupSub?.id) return;
+
+  const { data: studentRows } = await supabase
+    .from("student_submissions")
+    .select("status, kg_separated, reused_items")
+    .eq("group_id", groupId)
+    .eq("challenge_id", challengeId);
+
+  let participants = 0;
+  let kg = 0;
+  let reused = 0;
+  for (const row of studentRows ?? []) {
+    if (row.status === "submitted" || row.status === "approved") {
+      participants += 1;
+      kg += Number(row.kg_separated ?? 0);
+      reused += Number(row.reused_items ?? 0);
+    }
+  }
+
+  const teacherLocked = groupSub.status === "approved" || groupSub.status === "rejected";
+
+  // Participantes siempre se derivan (no son editables por el maestro).
+  await supabase
+    .from("submissions")
+    .update({ participants_count: participants, updated_at: new Date().toISOString() })
+    .eq("id", groupSub.id);
+
+  // Metricas: solo re-sembrar si el maestro no hizo override (grupo bloqueado).
+  if (!teacherLocked) {
+    await supabase.from("impact_metrics").upsert(
+      {
+        submission_id: groupSub.id,
+        kg_separated: kg,
+        reused_items: reused,
+        waste_reduced_estimate: kg
+      },
+      { onConflict: "submission_id" }
+    );
+  }
+
+  await recalcGroupSubmissionScore(groupSub.id);
 }
