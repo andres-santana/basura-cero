@@ -13,6 +13,8 @@ type ExistingSubmission = {
   id: string;
   status: "draft" | "submitted" | "approved" | "rejected";
   comments: string | null;
+  kgSeparated: number;
+  reusedItems: number;
   filesCount: number;
 };
 
@@ -28,6 +30,8 @@ export function StudentEvidenceUploader() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [files, setFiles] = useState<File[]>([]);
   const [comments, setComments] = useState("");
+  const [kgSeparated, setKgSeparated] = useState("");
+  const [reusedItems, setReusedItems] = useState("");
   const [existing, setExisting] = useState<ExistingSubmission | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -111,7 +115,12 @@ export function StudentEvidenceUploader() {
       const res = await fetch("/api/alumno/evidencia", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ comments: comments.trim() || undefined, files: uploaded })
+        body: JSON.stringify({
+          comments: comments.trim() || undefined,
+          kgSeparated: kgSeparated.trim() === "" ? 0 : Number(kgSeparated),
+          reusedItems: reusedItems.trim() === "" ? 0 : Number(reusedItems),
+          files: uploaded
+        })
       });
       const payload = await res.json();
       if (!res.ok) throw new Error(payload.error ?? "No se pudo guardar");
@@ -119,6 +128,8 @@ export function StudentEvidenceUploader() {
       setSuccess(true);
       setFiles([]);
       setComments("");
+      setKgSeparated("");
+      setReusedItems("");
       if (fileInputRef.current) fileInputRef.current.value = "";
       await load();
     } catch (err) {
@@ -146,10 +157,13 @@ export function StudentEvidenceUploader() {
       </div>
 
       {existing && (
-        <div className="flex items-center gap-2 rounded-2xl border-2 border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+        <div className="flex flex-wrap items-center gap-2 rounded-2xl border-2 border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
           <CheckCircle2 className="h-5 w-5" aria-hidden />
           Tu evidencia: <strong>{STATUS_LABEL[existing.status]}</strong>
           {existing.filesCount > 0 && <span>({existing.filesCount} foto(s))</span>}
+          <span className="text-emerald-700">
+            · {existing.kgSeparated} kg · {existing.reusedItems} cosas reutilizadas
+          </span>
         </div>
       )}
 
@@ -204,6 +218,48 @@ export function StudentEvidenceUploader() {
             ))}
           </ul>
         )}
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="font-semibold text-slate-700">
+              Cuantos kilos juntaste?
+            </span>
+            <input
+              type="number"
+              inputMode="decimal"
+              min={0}
+              step={0.1}
+              value={kgSeparated}
+              onChange={(e) => setKgSeparated(e.target.value)}
+              className="rounded-xl border border-slate-300 p-2 text-lg"
+              placeholder="0.5"
+            />
+            <span className="text-xs text-slate-500">
+              En kilogramos (kg). Si no lo pesaste, pon tu mejor calculo. Ej: media
+              bolsa es como 0.5 kg.
+            </span>
+          </label>
+
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="font-semibold text-slate-700">
+              Cuantas cosas reutilizaste?
+            </span>
+            <input
+              type="number"
+              inputMode="numeric"
+              min={0}
+              step={1}
+              value={reusedItems}
+              onChange={(e) => setReusedItems(e.target.value)}
+              className="rounded-xl border border-slate-300 p-2 text-lg"
+              placeholder="3"
+            />
+            <span className="text-xs text-slate-500">
+              Cuenta los objetos que volviste a usar en vez de tirarlos (botellas,
+              frascos, cajas...).
+            </span>
+          </label>
+        </div>
 
         <label className="mt-4 flex flex-col gap-1 text-sm">
           <span className="text-slate-700">Cuentanos que hiciste (opcional)</span>

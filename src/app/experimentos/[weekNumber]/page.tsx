@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { ExperimentDetailCard } from "@/components/experiments/experiment-detail-card";
-import { EvidenceUploader } from "@/components/evidence/evidence-uploader";
+import { EvidenceTeacherNotice } from "@/components/evidence/evidence-teacher-notice";
 import { EvidenceLoginPrompt } from "@/components/evidence/evidence-login-prompt";
 import { EvidenceRoleNotice } from "@/components/evidence/evidence-role-notice";
 import { getSession } from "@/lib/auth";
@@ -39,7 +39,7 @@ export default async function ExperimentPage({ params }: ExperimentPageProps) {
       {!session ? (
         <EvidenceLoginPrompt returnPath={returnPath} />
       ) : session.role === "teacher" || session.role === "admin" ? (
-        <EvidenceUploader />
+        <EvidenceTeacherNotice role={session.role} />
       ) : (
         <EvidenceRoleNotice role={session.role} />
       )}

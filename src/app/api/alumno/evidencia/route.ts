@@ -12,6 +12,8 @@ const fileSchema = z.object({
 
 const schema = z.object({
   comments: z.string().trim().max(500).optional(),
+  kgSeparated: z.coerce.number().min(0).max(1000).default(0),
+  reusedItems: z.coerce.number().int().min(0).max(10000).default(0),
   files: z.array(fileSchema).min(1, "Sube al menos una foto")
 });
 
@@ -30,7 +32,9 @@ export async function GET() {
 
     const { data: submission } = await supabase
       .from("student_submissions")
-      .select("id, status, comments, student_evidence_files(id)")
+      .select(
+        "id, status, comments, kg_separated, reused_items, student_evidence_files(id)"
+      )
       .eq("student_id", session.studentId)
       .eq("challenge_id", challenge.id)
       .maybeSingle();
@@ -41,6 +45,8 @@ export async function GET() {
             id: submission.id,
             status: submission.status,
             comments: submission.comments,
+            kgSeparated: Number(submission.kg_separated ?? 0),
+            reusedItems: Number(submission.reused_items ?? 0),
             filesCount: Array.isArray(submission.student_evidence_files)
               ? submission.student_evidence_files.length
               : 0
@@ -84,6 +90,8 @@ export async function POST(request: Request) {
           student_id: session.studentId,
           group_id: session.groupId,
           comments: parsed.data.comments ?? null,
+          kg_separated: parsed.data.kgSeparated,
+          reused_items: parsed.data.reusedItems,
           status: "submitted",
           submitted_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
