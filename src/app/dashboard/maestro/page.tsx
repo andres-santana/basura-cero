@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Route } from "next";
+import { BookOpenText } from "lucide-react";
 import { RoleGuard } from "@/components/auth/role-guard";
 import { ProgressRing52Weeks } from "@/components/gamification/progress-ring-52-weeks";
 import { BadgeGrid } from "@/components/gamification/badge-grid";
@@ -35,8 +36,31 @@ export default async function TeacherDashboardPage() {
             >
               Gestionar evidencias
             </Link>
+            <Link
+              href="/manuales/maestro"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300 px-3 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-50"
+            >
+              <BookOpenText className="h-4 w-4" aria-hidden /> Manual del maestro
+            </Link>
           </div>
         </div>
+
+        <Link
+          href="/manuales/maestro"
+          className="flex items-center gap-3 rounded-2xl border border-emerald-200 bg-white p-4 transition hover:bg-emerald-50"
+        >
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-100">
+            <BookOpenText className="h-5 w-5 text-emerald-700" aria-hidden />
+          </span>
+          <span>
+            <span className="block text-sm font-semibold text-emerald-800">
+              Primera vez aqui? Lee el manual del maestro
+            </span>
+            <span className="block text-xs text-slate-500">
+              Acceso, gestion de alumnos y como registrar evidencias.
+            </span>
+          </span>
+        </Link>
 
         {challenge ? (
           <section className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5">

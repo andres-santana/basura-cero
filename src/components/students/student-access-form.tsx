@@ -2,7 +2,8 @@
 
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { KeyRound, Loader2 } from "lucide-react";
+import Link from "next/link";
+import { BookOpenText, KeyRound, Loader2 } from "lucide-react";
 import { getErrorMessage } from "@/lib/error-message";
 import { Mascot } from "@/components/students/mascot";
 
@@ -101,6 +102,13 @@ function AccessFormInner() {
       <p className="mt-4 text-sm text-slate-600">
         Tu maestra o maestro te da este codigo.
       </p>
+
+      <Link
+        href="/manuales/alumno"
+        className="mt-5 inline-flex items-center justify-center gap-2 rounded-2xl border-2 border-emerald-200 px-4 py-3 text-base font-bold text-emerald-700 transition hover:bg-emerald-50 active:scale-95"
+      >
+        <BookOpenText className="h-5 w-5" aria-hidden /> Como se usa? Ver mi manual
+      </Link>
     </div>
   );
 }

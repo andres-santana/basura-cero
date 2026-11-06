@@ -1,6 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
+import { SiteFooter } from "./site-footer";
 
 /**
  * Decide el "chrome" (navegacion + contenedor) segun la ruta.
@@ -18,16 +19,20 @@ export function SiteChrome({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const isStudentArea = pathname?.startsWith("/alumno") ?? false;
+  // La zona del alumno y el manual del alumno traen su propio chrome infantil.
+  const isBareArea =
+    (pathname?.startsWith("/alumno") ?? false) ||
+    (pathname?.startsWith("/manuales/alumno") ?? false);
 
-  if (isStudentArea) {
+  if (isBareArea) {
     return <>{children}</>;
   }
 
   return (
-    <>
+    <div className="flex min-h-screen flex-col">
       {nav}
-      <main className="mx-auto max-w-6xl px-4 py-8">{children}</main>
-    </>
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">{children}</main>
+      <SiteFooter />
+    </div>
   );
 }

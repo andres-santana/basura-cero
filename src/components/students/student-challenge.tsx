@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Camera, CheckCircle2, Circle, LogOut, Sparkles, Trophy } from "lucide-react";
+import { BookOpenText, Camera, CheckCircle2, Circle, LogOut, Sparkles, Trophy } from "lucide-react";
 import { getErrorMessage } from "@/lib/error-message";
 import { MiniGame, type MiniGameData } from "@/components/students/mini-game";
 import { Mascot } from "@/components/students/mascot";
@@ -141,13 +141,21 @@ export function StudentChallenge({
         <p className="mt-2 text-base text-amber-900">
           Pregunta a tu maestra o maestro cuando empiece el reto de esta semana.
         </p>
-        <button
-          type="button"
-          onClick={() => void logout()}
-          className="mt-5 rounded-2xl border-2 border-amber-300 px-4 py-2 text-sm font-semibold text-amber-800"
-        >
-          Salir
-        </button>
+        <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+          <Link
+            href="/manuales/alumno"
+            className="inline-flex items-center gap-1.5 rounded-2xl border-2 border-emerald-200 px-4 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-50"
+          >
+            <BookOpenText className="h-4 w-4" aria-hidden /> Ver mi manual
+          </Link>
+          <button
+            type="button"
+            onClick={() => void logout()}
+            className="rounded-2xl border-2 border-amber-300 px-4 py-2 text-sm font-semibold text-amber-800"
+          >
+            Salir
+          </button>
+        </div>
       </div>
     );
   }
@@ -174,13 +182,21 @@ export function StudentChallenge({
             Semana {view.challenge.weekNumber}
           </h1>
         </div>
-        <button
-          type="button"
-          onClick={() => void logout()}
-          className="inline-flex items-center gap-1 rounded-2xl border-2 border-slate-200 px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50"
-        >
-          <LogOut className="h-4 w-4" aria-hidden /> Salir
-        </button>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/manuales/alumno"
+            className="inline-flex items-center gap-1 rounded-2xl border-2 border-emerald-200 px-3 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-50"
+          >
+            <BookOpenText className="h-4 w-4" aria-hidden /> Manual
+          </Link>
+          <button
+            type="button"
+            onClick={() => void logout()}
+            className="inline-flex items-center gap-1 rounded-2xl border-2 border-slate-200 px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+          >
+            <LogOut className="h-4 w-4" aria-hidden /> Salir
+          </button>
+        </div>
       </header>
 
       <MascotBubble
