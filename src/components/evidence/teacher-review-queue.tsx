@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { Lightbox, type LightboxItem } from "@/components/ui/lightbox";
 
 type SubmissionStatus = "draft" | "submitted" | "approved" | "rejected";
 
@@ -66,6 +67,21 @@ export function TeacherReviewQueue() {
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   // Edicion local de metricas por entrega (kg / materiales).
   const [edits, setEdits] = useState<Record<string, { kg: string; reused: string }>>({});
+  // Visor de imagenes: lista de imagenes de la entrega abierta + indice activo.
+  const [lightboxItems, setLightboxItems] = useState<LightboxItem[]>([]);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+
+  const openLightbox = (list: SignedFile[], fileId: string) => {
+    const images = list.filter((f) => f.signedUrl && isImage(f.type));
+    const items: LightboxItem[] = images.map((f) => ({
+      id: f.id,
+      url: f.signedUrl as string,
+      caption: f.studentAlias ?? null
+    }));
+    const idx = items.findIndex((it) => it.id === fileId);
+    setLightboxItems(items);
+    setLightboxIndex(idx >= 0 ? idx : 0);
+  };
 
   const filter = FILTERS.find((f) => f.id === filterId) ?? FILTERS[0];
 
@@ -339,14 +355,19 @@ export function TeacherReviewQueue() {
                         >
                           {f.signedUrl ? (
                             isImage(f.type) ? (
-                              <a href={f.signedUrl} target="_blank" rel="noreferrer">
+                              <button
+                                type="button"
+                                onClick={() => openLightbox(files, f.id)}
+                                className="block w-full cursor-zoom-in"
+                                aria-label="Ver evidencia en grande"
+                              >
                                 {/* eslint-disable-next-line @next/next/no-img-element */}
                                 <img
                                   src={f.signedUrl}
                                   alt="Evidencia del alumno"
                                   className="h-40 w-full object-cover"
                                 />
-                              </a>
+                              </button>
                             ) : (
                               <a
                                 href={f.signedUrl}
@@ -409,6 +430,13 @@ export function TeacherReviewQueue() {
           );
         })}
       </ul>
+
+      <Lightbox
+        items={lightboxItems}
+        index={lightboxIndex}
+        onClose={() => setLightboxIndex(null)}
+        onNavigate={setLightboxIndex}
+      />
     </section>
   );
 }

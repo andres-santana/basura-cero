@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { Lightbox, type LightboxItem } from "@/components/ui/lightbox";
 
 type Status = "draft" | "submitted" | "approved" | "rejected";
 
@@ -56,6 +57,21 @@ export function StudentEvidenceReview() {
   const [busyId, setBusyId] = useState<string | null>(null);
   // Edicion local de metricas por alumno (kg / materiales).
   const [edits, setEdits] = useState<Record<string, { kg: string; reused: string }>>({});
+  // Visor de imagenes.
+  const [lightboxItems, setLightboxItems] = useState<LightboxItem[]>([]);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+
+  const openLightbox = (list: SignedFile[], fileId: string, alias: string) => {
+    const images = list.filter((f) => f.signedUrl && isImage(f.type));
+    const items: LightboxItem[] = images.map((f) => ({
+      id: f.id,
+      url: f.signedUrl as string,
+      caption: alias
+    }));
+    const idx = items.findIndex((it) => it.id === fileId);
+    setLightboxItems(items);
+    setLightboxIndex(idx >= 0 ? idx : 0);
+  };
 
   const filter = FILTERS.find((f) => f.id === filterId) ?? FILTERS[0];
 
@@ -252,13 +268,20 @@ export function StudentEvidenceReview() {
                   <div className="flex flex-wrap gap-3">
                     {files.map((f) =>
                       f.signedUrl && isImage(f.type) ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
+                        <button
                           key={f.id}
-                          src={f.signedUrl}
-                          alt="Evidencia del alumno"
-                          className="h-32 w-32 rounded-lg border object-cover"
-                        />
+                          type="button"
+                          onClick={() => openLightbox(files, f.id, s.student.alias)}
+                          className="cursor-zoom-in rounded-lg border"
+                          aria-label="Ver evidencia en grande"
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={f.signedUrl}
+                            alt="Evidencia del alumno"
+                            className="h-32 w-32 rounded-lg object-cover"
+                          />
+                        </button>
                       ) : (
                         <a
                           key={f.id}
@@ -306,6 +329,13 @@ export function StudentEvidenceReview() {
           );
         })}
       </ul>
+
+      <Lightbox
+        items={lightboxItems}
+        index={lightboxIndex}
+        onClose={() => setLightboxIndex(null)}
+        onNavigate={setLightboxIndex}
+      />
     </section>
   );
 }
