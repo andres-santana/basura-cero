@@ -3,10 +3,12 @@ import { z } from "zod";
 import { HttpError, jsonError } from "@/lib/auth-admin";
 import { assertGroupOwnership, requireTeacherWithSchool } from "@/lib/auth-teacher";
 import { createServerSupabase } from "@/lib/supabase/server";
-import { recalcGroupSubmissionScore } from "@/lib/services/scoring-service";
+import { syncGroupMetricsFromStudents } from "@/lib/services/teacher-evidence";
 
 const schema = z.object({
-  status: z.enum(["submitted", "approved", "rejected"])
+  status: z.enum(["submitted", "approved", "rejected"]).optional(),
+  kgSeparated: z.coerce.number().min(0).max(1000).optional(),
+  reusedItems: z.coerce.number().int().min(0).max(10000).optional()
 });
 
 export async function PATCH(
@@ -20,6 +22,13 @@ export async function PATCH(
     const parsed = schema.safeParse(json);
     if (!parsed.success) {
       return NextResponse.json({ error: "Datos invalidos" }, { status: 400 });
+    }
+    if (
+      parsed.data.status === undefined &&
+      parsed.data.kgSeparated === undefined &&
+      parsed.data.reusedItems === undefined
+    ) {
+      return NextResponse.json({ error: "Nada que actualizar" }, { status: 400 });
     }
 
     const supabase = createServerSupabase();
@@ -41,24 +50,26 @@ export async function PATCH(
     // El maestro debe tener asignado el grupo (admin pasa libre).
     await assertGroupOwnership(session, submission.group_id as string);
 
+    const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+    if (parsed.data.status !== undefined) patch.status = parsed.data.status;
+    if (parsed.data.kgSeparated !== undefined) patch.kg_separated = parsed.data.kgSeparated;
+    if (parsed.data.reusedItems !== undefined) patch.reused_items = parsed.data.reusedItems;
+
     const { error } = await supabase
       .from("student_submissions")
-      .update({ status: parsed.data.status, updated_at: new Date().toISOString() })
+      .update(patch)
       .eq("id", id);
     if (error) throw error;
 
-    // Reflejar en el score del grupo si ya hay entrega de grupo del reto.
-    const { data: groupSub } = await supabase
-      .from("submissions")
-      .select("id")
-      .eq("challenge_id", submission.challenge_id)
-      .eq("group_id", submission.group_id)
-      .maybeSingle();
-    if (groupSub?.id) {
-      await recalcGroupSubmissionScore(groupSub.id);
-    }
+    // Re-sincroniza la entrega de grupo: participantes y metricas se derivan de
+    // las evidencias de alumnos no rechazadas, y se recalcula el score.
+    await syncGroupMetricsFromStudents(
+      supabase,
+      submission.group_id as string,
+      submission.challenge_id as string
+    );
 
-    return NextResponse.json({ ok: true, status: parsed.data.status });
+    return NextResponse.json({ ok: true, status: parsed.data.status ?? null });
   } catch (error) {
     return jsonError(error);
   }

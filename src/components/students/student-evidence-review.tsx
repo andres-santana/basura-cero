@@ -9,6 +9,8 @@ type StudentSubmission = {
   status: Status;
   submittedAt: string | null;
   comments: string | null;
+  kgSeparated: number;
+  reusedItems: number;
   student: { alias: string; grade: string | null };
   group: { id: string; name: string | null };
   weekNumber: number | null;
@@ -52,6 +54,8 @@ export function StudentEvidenceReview() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [filesById, setFilesById] = useState<Record<string, SignedFile[]>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
+  // Edicion local de metricas por alumno (kg / materiales).
+  const [edits, setEdits] = useState<Record<string, { kg: string; reused: string }>>({});
 
   const filter = FILTERS.find((f) => f.id === filterId) ?? FILTERS[0];
 
@@ -89,23 +93,47 @@ export function StudentEvidenceReview() {
       return;
     }
     setExpandedId(s.id);
+    setEdits((cur) =>
+      cur[s.id]
+        ? cur
+        : { ...cur, [s.id]: { kg: String(s.kgSeparated), reused: String(s.reusedItems) } }
+    );
     if (s.filesCount > 0) await loadFiles(s.id);
   };
 
-  const updateStatus = async (s: StudentSubmission, status: Status) => {
+  const patch = async (s: StudentSubmission, body: Record<string, unknown>) => {
     setBusyId(s.id);
     setError(null);
     const res = await fetch(`/api/maestro/alumnos-evidencias/${s.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status })
+      body: JSON.stringify(body)
     });
-    if (!res.ok) {
+    const ok = res.ok;
+    if (!ok) {
       const payload = await res.json().catch(() => ({}));
       setError(payload.error ?? "No se pudo actualizar");
     }
     setBusyId(null);
-    await load();
+    return ok;
+  };
+
+  const updateStatus = async (s: StudentSubmission, status: Status) => {
+    const ok = await patch(s, { status });
+    if (ok) await load();
+  };
+
+  const saveMetrics = async (s: StudentSubmission) => {
+    const edit = edits[s.id];
+    if (!edit) return;
+    const kg = edit.kg.trim() === "" ? 0 : Number(edit.kg);
+    const reused = edit.reused.trim() === "" ? 0 : Number(edit.reused);
+    if (Number.isNaN(kg) || Number.isNaN(reused)) {
+      setError("Revisa los valores de kg y materiales");
+      return;
+    }
+    const ok = await patch(s, { kgSeparated: kg, reusedItems: reused });
+    if (ok) await load();
   };
 
   return (
@@ -144,6 +172,10 @@ export function StudentEvidenceReview() {
         {data.map((s) => {
           const expanded = expandedId === s.id;
           const files = filesById[s.id] ?? [];
+          const edit = edits[s.id] ?? {
+            kg: String(s.kgSeparated),
+            reused: String(s.reusedItems)
+          };
           return (
             <li key={s.id} className="rounded-xl border bg-white">
               <button
@@ -159,7 +191,7 @@ export function StudentEvidenceReview() {
                   </div>
                   <p className="mt-1 text-xs text-slate-500">
                     Semana {s.weekNumber ?? "?"} · {s.experimentTitle ?? "Sin reto"} ·{" "}
-                    {s.filesCount} foto(s)
+                    {s.filesCount} foto(s) · {s.kgSeparated} kg · {s.reusedItems} reutilizados
                   </p>
                 </div>
               </button>
@@ -167,6 +199,56 @@ export function StudentEvidenceReview() {
               {expanded && (
                 <div className="space-y-3 border-t border-slate-100 p-4">
                   {s.comments && <p className="text-sm text-slate-700">{s.comments}</p>}
+
+                  {/* Metricas reportadas por el alumno, editables por el maestro */}
+                  <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+                    <label className="flex flex-col gap-1 text-sm">
+                      <span className="text-slate-700">Kg separados</span>
+                      <input
+                        type="number"
+                        min={0}
+                        step={0.1}
+                        value={edit.kg}
+                        onChange={(e) =>
+                          setEdits((cur) => ({
+                            ...cur,
+                            [s.id]: { ...edit, kg: e.target.value }
+                          }))
+                        }
+                        className="rounded-lg border border-slate-300 p-2"
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1 text-sm">
+                      <span className="text-slate-700">Materiales reutilizados</span>
+                      <input
+                        type="number"
+                        min={0}
+                        step={1}
+                        value={edit.reused}
+                        onChange={(e) =>
+                          setEdits((cur) => ({
+                            ...cur,
+                            [s.id]: { ...edit, reused: e.target.value }
+                          }))
+                        }
+                        className="rounded-lg border border-slate-300 p-2"
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      disabled={busyId === s.id}
+                      onClick={() => void saveMetrics(s)}
+                      className="rounded-lg border border-emerald-300 px-3 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-50 disabled:opacity-50"
+                    >
+                      Guardar datos
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-slate-400">
+                    El alumno reporto {s.kgSeparated} kg y {s.reusedItems} materiales.
+                    Ajustalo si el dato no es real. Las evidencias rechazadas no suman
+                    al total del grupo.
+                  </p>
+
                   <div className="flex flex-wrap gap-3">
                     {files.map((f) =>
                       f.signedUrl && isImage(f.type) ? (
