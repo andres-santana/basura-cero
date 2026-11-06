@@ -5,6 +5,7 @@ import {
   jsonError,
   requireAdminWithSchool
 } from "@/lib/auth-admin";
+import { shouldRequirePasswordChange } from "@/lib/services/school-settings";
 import { createServerSupabase } from "@/lib/supabase/server";
 
 const createSchema = z.object({
@@ -60,6 +61,7 @@ export async function POST(request: Request) {
 
     const supabase = createServerSupabase();
     const password = parsed.data.password ?? generateTempPassword();
+    const mustChangePassword = await shouldRequirePasswordChange(session.schoolId);
 
     const { data: created, error: authError } = await supabase.auth.admin.createUser({
       email: parsed.data.email,
@@ -83,7 +85,7 @@ export async function POST(request: Request) {
       email: parsed.data.email,
       role: "teacher",
       is_active: true,
-      must_change_password: true
+      must_change_password: mustChangePassword
     });
 
     if (userInsertError) {
