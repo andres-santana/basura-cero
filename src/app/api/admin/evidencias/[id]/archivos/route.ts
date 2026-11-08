@@ -17,7 +17,7 @@ export async function GET(
     const { data, error } = await supabase
       .from("submissions")
       .select(
-        "id, groups(school_id), evidence_files(id, file_path, file_type)"
+        "id, group_id, challenge_id, groups(school_id), evidence_files(id, file_path, file_type)"
       )
       .eq("id", id)
       .maybeSingle();
@@ -28,7 +28,30 @@ export async function GET(
       return NextResponse.json({ error: "Evidencia no encontrada" }, { status: 404 });
     }
 
-    const files = data.evidence_files ?? [];
+    // Archivos propios de la entrega de grupo.
+    const groupFiles = (data.evidence_files ?? []).map((f) => ({
+      id: f.id,
+      file_path: f.file_path,
+      file_type: f.file_type
+    }));
+
+    // La evidencia del grupo tambien incluye las fotos subidas por los alumnos
+    // para ese (grupo, reto), que viven en student_evidence_files.
+    const { data: studentSubs } = await supabase
+      .from("student_submissions")
+      .select("id, student_evidence_files(id, file_path, file_type)")
+      .eq("group_id", data.group_id)
+      .eq("challenge_id", data.challenge_id)
+      .in("status", ["submitted", "approved"]);
+
+    const studentFiles = (studentSubs ?? []).flatMap((sub) =>
+      (
+        (sub as { student_evidence_files?: { id: string; file_path: string; file_type: string }[] | null })
+          .student_evidence_files ?? []
+      ).map((f) => ({ id: f.id, file_path: f.file_path, file_type: f.file_type }))
+    );
+
+    const files = [...groupFiles, ...studentFiles];
     if (!files.length) {
       return NextResponse.json({ data: [] });
     }

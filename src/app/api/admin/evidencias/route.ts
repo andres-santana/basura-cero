@@ -46,6 +46,29 @@ export async function GET(request: Request) {
     const { data, error } = await query;
     if (error) throw error;
 
+    // Las fotos de la evidencia del grupo pueden provenir de las evidencias de
+    // los alumnos (student_evidence_files). Contamos esas fotos por (grupo,
+    // reto) para que el conteo "N archivo(s)" no muestre 0 cuando los alumnos
+    // si adjuntaron archivos.
+    const groupIds = Array.from(new Set((data ?? []).map((r) => r.group_id)));
+    const challengeIds = Array.from(new Set((data ?? []).map((r) => r.challenge_id)));
+    const studentFilesByKey = new Map<string, number>();
+    if (groupIds.length && challengeIds.length) {
+      const { data: studentSubs } = await supabase
+        .from("student_submissions")
+        .select("group_id, challenge_id, status, student_evidence_files(id)")
+        .in("group_id", groupIds)
+        .in("challenge_id", challengeIds)
+        .in("status", ["submitted", "approved"]);
+      for (const sub of studentSubs ?? []) {
+        const key = `${sub.group_id}:${sub.challenge_id}`;
+        const files = (sub as { student_evidence_files?: { id: string }[] | null })
+          .student_evidence_files;
+        const count = Array.isArray(files) ? files.length : 0;
+        studentFilesByKey.set(key, (studentFilesByKey.get(key) ?? 0) + count);
+      }
+    }
+
     return NextResponse.json({
       data: (data ?? []).map((row) => {
         const groups = Array.isArray(row.groups) ? row.groups[0] : row.groups;
@@ -94,7 +117,11 @@ export async function GET(request: Request) {
             id: f.id,
             path: f.file_path,
             type: f.file_type
-          }))
+          })),
+          // Conteo real = archivos del grupo + fotos de los alumnos del reto.
+          filesCount:
+            (row.evidence_files ?? []).length +
+            (studentFilesByKey.get(`${row.group_id}:${row.challenge_id}`) ?? 0)
         };
       })
     });

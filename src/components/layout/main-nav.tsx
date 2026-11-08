@@ -9,7 +9,8 @@ const publicLinks: Array<{ href: Route; label: string }> = [
   { href: "/experimentos", label: "Experimentos" },
   { href: "/calendario", label: "Calendario" },
   { href: "/ranking", label: "Ranking" },
-  { href: "/insignias", label: "Insignias" }
+  { href: "/insignias", label: "Insignias" },
+  { href: "/jurado", label: "Jurado" }
 ];
 
 const ROLE_LABEL: Record<string, string> = {
@@ -30,7 +31,6 @@ export async function MainNav() {
             {link.label}
           </Link>
         ))}
-        {role === "jury" && <Link href="/jurado">Jurado</Link>}
         {role === "admin" && <Link href="/dashboard/admin">Panel admin</Link>}
         {(role === "teacher" || role === "group") && (
           <Link href="/dashboard/maestro">Mi panel</Link>

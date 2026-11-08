@@ -38,6 +38,10 @@ export function SemanasManager() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editDates, setEditDates] = useState<
+    Record<string, { startDate: string; endDate: string }>
+  >({});
   const [form, setForm] = useState({
     experimentId: "",
     startDate: todayIso(),
@@ -137,6 +141,35 @@ export function SemanasManager() {
     await load();
   };
 
+  const handleSaveDates = async (challenge: Challenge) => {
+    const draft = editDates[challenge.id];
+    if (!draft) return;
+    if (draft.endDate < draft.startDate) {
+      setError("La fecha fin no puede ser anterior a la de inicio");
+      return;
+    }
+    setBusyId(challenge.id);
+    setError(null);
+    const res = await fetch(`/api/admin/semanas/${challenge.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ startDate: draft.startDate, endDate: draft.endDate })
+    });
+    setBusyId(null);
+    if (!res.ok) {
+      const payload = await res.json().catch(() => ({}));
+      setError(payload.error ?? "No se pudieron actualizar las fechas");
+      return;
+    }
+    setEditingId(null);
+    setEditDates((prev) => {
+      const next = { ...prev };
+      delete next[challenge.id];
+      return next;
+    });
+    await load();
+  };
+
   const handleDelete = async (challenge: Challenge) => {
     if (!confirm(`Eliminar reto de la semana ${challenge.weekNumber}?`)) return;
     setBusyId(challenge.id);
@@ -188,8 +221,12 @@ export function SemanasManager() {
         onSubmit={handleCreate}
         className="grid gap-3 rounded-xl border bg-white p-4 sm:grid-cols-2"
       >
-        <div className="sm:col-span-2 text-sm font-semibold text-slate-700">
-          Programar reto
+        <div className="sm:col-span-2">
+          <p className="text-sm font-semibold text-slate-700">Programar reto</p>
+          <p className="mt-0.5 text-xs text-slate-500">
+            Crea un nuevo reto. Para cambiar las fechas de un reto ya programado,
+            usa &quot;Editar fechas&quot; en la tabla de abajo (no crees uno nuevo).
+          </p>
         </div>
         <label className="text-sm sm:col-span-2">
           <span className="block text-slate-600">Experimento</span>
@@ -287,7 +324,43 @@ export function SemanasManager() {
                 <td className="px-3 py-2">{c.weekNumber ?? "-"}</td>
                 <td className="px-3 py-2">{c.title ?? "-"}</td>
                 <td className="px-3 py-2 text-xs">
-                  {c.startDate} a {c.endDate}
+                  {editingId === c.id ? (
+                    <div className="flex flex-col gap-1">
+                      <input
+                        type="date"
+                        value={editDates[c.id]?.startDate ?? c.startDate}
+                        onChange={(e) =>
+                          setEditDates((prev) => ({
+                            ...prev,
+                            [c.id]: {
+                              startDate: e.target.value,
+                              endDate: prev[c.id]?.endDate ?? c.endDate
+                            }
+                          }))
+                        }
+                        className="rounded border border-slate-300 px-2 py-1"
+                      />
+                      <input
+                        type="date"
+                        min={editDates[c.id]?.startDate ?? c.startDate}
+                        value={editDates[c.id]?.endDate ?? c.endDate}
+                        onChange={(e) =>
+                          setEditDates((prev) => ({
+                            ...prev,
+                            [c.id]: {
+                              startDate: prev[c.id]?.startDate ?? c.startDate,
+                              endDate: e.target.value
+                            }
+                          }))
+                        }
+                        className="rounded border border-slate-300 px-2 py-1"
+                      />
+                    </div>
+                  ) : (
+                    <>
+                      {c.startDate} a {c.endDate}
+                    </>
+                  )}
                 </td>
                 <td className="px-3 py-2">
                   <span
@@ -302,33 +375,77 @@ export function SemanasManager() {
                 </td>
                 <td className="px-3 py-2">
                   <div className="flex flex-wrap gap-2">
-                    {c.isCurrent ? (
-                      <button
-                        type="button"
-                        disabled={busyId === c.id}
-                        onClick={() => handleDeactivate(c)}
-                        className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50 disabled:opacity-60"
-                      >
-                        Desactivar
-                      </button>
+                    {editingId === c.id ? (
+                      <>
+                        <button
+                          type="button"
+                          disabled={busyId === c.id}
+                          onClick={() => handleSaveDates(c)}
+                          className="rounded bg-emerald-600 px-2 py-1 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-60"
+                        >
+                          {busyId === c.id ? "Guardando..." : "Guardar"}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={busyId === c.id}
+                          onClick={() => {
+                            setEditingId(null);
+                            setEditDates((prev) => {
+                              const next = { ...prev };
+                              delete next[c.id];
+                              return next;
+                            });
+                          }}
+                          className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50 disabled:opacity-60"
+                        >
+                          Cancelar
+                        </button>
+                      </>
                     ) : (
-                      <button
-                        type="button"
-                        disabled={busyId === c.id}
-                        onClick={() => handleActivate(c)}
-                        className="rounded bg-emerald-600 px-2 py-1 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-60"
-                      >
-                        Marcar activo
-                      </button>
+                      <>
+                        <button
+                          type="button"
+                          disabled={busyId === c.id}
+                          onClick={() => {
+                            setEditingId(c.id);
+                            setEditDates((prev) => ({
+                              ...prev,
+                              [c.id]: { startDate: c.startDate, endDate: c.endDate }
+                            }));
+                          }}
+                          className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50 disabled:opacity-60"
+                        >
+                          Editar fechas
+                        </button>
+                        {c.isCurrent ? (
+                          <button
+                            type="button"
+                            disabled={busyId === c.id}
+                            onClick={() => handleDeactivate(c)}
+                            className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50 disabled:opacity-60"
+                          >
+                            Desactivar
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={busyId === c.id}
+                            onClick={() => handleActivate(c)}
+                            className="rounded bg-emerald-600 px-2 py-1 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-60"
+                          >
+                            Marcar activo
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          disabled={busyId === c.id}
+                          onClick={() => handleDelete(c)}
+                          className="rounded border border-red-300 px-2 py-1 text-xs text-red-600 hover:bg-red-50 disabled:opacity-60"
+                        >
+                          Eliminar
+                        </button>
+                      </>
                     )}
-                    <button
-                      type="button"
-                      disabled={busyId === c.id}
-                      onClick={() => handleDelete(c)}
-                      className="rounded border border-red-300 px-2 py-1 text-xs text-red-600 hover:bg-red-50 disabled:opacity-60"
-                    >
-                      Eliminar
-                    </button>
                   </div>
                 </td>
               </tr>
