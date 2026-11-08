@@ -99,12 +99,45 @@ export async function DELETE(
       return NextResponse.json({ error: "Reto no encontrado" }, { status: 404 });
     }
 
+    // Proteccion contra borrado destructivo: submissions y student_submissions
+    // tienen ON DELETE CASCADE hacia weekly_challenges, por lo que eliminar el
+    // reto borraria TODAS sus evidencias (de grupo y de alumnos) y sus
+    // archivos/metricas/scores. Bloqueamos el borrado si hay evidencias.
+    const [groupSubs, studentSubs] = await Promise.all([
+      supabase
+        .from("submissions")
+        .select("id", { count: "exact", head: true })
+        .eq("challenge_id", id),
+      supabase
+        .from("student_submissions")
+        .select("id", { count: "exact", head: true })
+        .eq("challenge_id", id)
+    ]);
+    if (groupSubs.error) throw groupSubs.error;
+    if (studentSubs.error) throw studentSubs.error;
+
+    const groupCount = groupSubs.count ?? 0;
+    const studentCount = studentSubs.count ?? 0;
+    if (groupCount > 0 || studentCount > 0) {
+      return NextResponse.json(
+        {
+          error:
+            `No se puede eliminar: este reto tiene ${studentCount} evidencia(s) de ` +
+            `alumnos y ${groupCount} de grupo. Eliminarlo borraria todas ellas de ` +
+            `forma permanente. Desactivalo en su lugar.`,
+          groupCount,
+          studentCount
+        },
+        { status: 409 }
+      );
+    }
+
     const { error } = await supabase.from("weekly_challenges").delete().eq("id", id);
     if (error) {
       return NextResponse.json(
         {
           error:
-            "No se pudo eliminar. Probablemente tiene evidencias asociadas; desactivalo en su lugar."
+            "No se pudo eliminar. Probablemente tiene datos asociados; desactivalo en su lugar."
         },
         { status: 409 }
       );

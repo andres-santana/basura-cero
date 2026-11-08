@@ -171,7 +171,21 @@ export function SemanasManager() {
   };
 
   const handleDelete = async (challenge: Challenge) => {
-    if (!confirm(`Eliminar reto de la semana ${challenge.weekNumber}?`)) return;
+    // Confirmacion fuerte: eliminar un reto borra en cascada todas sus
+    // evidencias. Pedimos escribir el numero de semana para evitar borrados
+    // accidentales con un solo clic.
+    const expected = String(challenge.weekNumber ?? "");
+    const typed = prompt(
+      `ELIMINAR el reto de la semana ${challenge.weekNumber} es permanente y ` +
+        `borrara todas sus evidencias de grupo y de alumnos.\n\n` +
+        `Si de verdad quieres eliminarlo, escribe el numero de semana (${expected}) para confirmar.\n` +
+        `Si solo quieres sacarlo de circulacion, cancela y usa "Desactivar".`
+    );
+    if (typed === null) return;
+    if (typed.trim() !== expected) {
+      setError("Confirmacion incorrecta: no se elimino el reto.");
+      return;
+    }
     setBusyId(challenge.id);
     setError(null);
     const res = await fetch(`/api/admin/semanas/${challenge.id}`, {
