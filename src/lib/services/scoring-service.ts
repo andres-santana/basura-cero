@@ -160,7 +160,17 @@ export async function recalcGroupSubmissionScore(submissionId: string): Promise<
 
   const challenge = pickOne(row.weekly_challenges);
   const metrics = pickOne(row.impact_metrics);
-  const filesCount = Array.isArray(row.evidence_files) ? row.evidence_files.length : 0;
+  const groupFilesCount = Array.isArray(row.evidence_files) ? row.evidence_files.length : 0;
+
+  // La evidencia del grupo puede estar formada por fotos subidas por los
+  // alumnos (student_evidence_files), que no viven en evidence_files. Contamos
+  // ambas fuentes para no perder el componente "evidencia" del puntaje cuando
+  // la entrega del grupo se deriva de las evidencias de alumnos.
+  const studentFilesCount = await countStudentEvidenceFiles(
+    row.group_id,
+    row.challenge_id
+  );
+  const filesCount = groupFilesCount + studentFilesCount;
 
   const daysLate = challenge ? computeDaysLate(challenge.end_date, row.submitted_at) : 0;
 
@@ -180,6 +190,99 @@ export async function recalcGroupSubmissionScore(submissionId: string): Promise<
     isOnTime: daysLate === 0,
     stepsCompletionRatio: progress.stepsCompletionRatio,
     gamesCompletionRatio: progress.gamesCompletionRatio
+  });
+
+  // Tras recalcular el score, reevalua las insignias del grupo para que el
+  // ranking y la vista de insignias queden consistentes.
+  await assignBadgesForGroup(row.group_id).catch(() => {
+    /* las insignias son best-effort: no deben romper el guardado del score */
+  });
+}
+
+/**
+ * Cuenta las fotos de alumnos (student_evidence_files) asociadas a un (grupo,
+ * reto). Son la evidencia real cuando la entrega del grupo se arma a partir de
+ * las evidencias enviadas por los alumnos.
+ */
+async function countStudentEvidenceFiles(
+  groupId: string,
+  challengeId: string
+): Promise<number> {
+  const supabase = createServerSupabase();
+  const { data, error } = await supabase
+    .from("student_submissions")
+    .select("id, student_evidence_files(id)")
+    .eq("group_id", groupId)
+    .eq("challenge_id", challengeId)
+    .in("status", ["submitted", "approved"]);
+  if (error || !data) return 0;
+  return data.reduce((sum, row) => {
+    const files = (row as { student_evidence_files?: { id: string }[] | null })
+      .student_evidence_files;
+    return sum + (Array.isArray(files) ? files.length : 0);
+  }, 0);
+}
+
+/**
+ * Reevalua y persiste las insignias de un grupo a partir de sus agregados
+ * actuales (kg acumulados, semanas completadas y participacion promedio).
+ * Se invoca al recalcular el score para que insignias y ranking reflejen el
+ * estado mas reciente.
+ */
+export async function assignBadgesForGroup(groupId: string): Promise<void> {
+  const supabase = createServerSupabase();
+
+  const { data: subs } = await supabase
+    .from("submissions")
+    .select(
+      "id, participants_count, status, impact_metrics(kg_separated), scores(breakdown_json)"
+    )
+    .eq("group_id", groupId)
+    .in("status", ["submitted", "approved"]);
+
+  const rows = subs ?? [];
+  let totalKgSeparated = 0;
+  let onTimeSubmissions = 0;
+  let participationSum = 0;
+  let participationCount = 0;
+
+  for (const sub of rows) {
+    const metrics = pickOne(
+      (sub as { impact_metrics: unknown }).impact_metrics as
+        | { kg_separated: number | null }
+        | { kg_separated: number | null }[]
+        | null
+    );
+    totalKgSeparated += Number(metrics?.kg_separated ?? 0);
+
+    const score = pickOne(
+      (sub as { scores: unknown }).scores as
+        | { breakdown_json: Record<string, number> | null }
+        | { breakdown_json: Record<string, number> | null }[]
+        | null
+    );
+    const daysLate = Number(score?.breakdown_json?.daysLate ?? 0);
+    if (daysLate <= 0) onTimeSubmissions += 1;
+
+    const participants = Number((sub as { participants_count: number | null }).participants_count ?? 0);
+    if (participants > 0) {
+      participationSum += participants;
+      participationCount += 1;
+    }
+  }
+
+  const completedWeeks = rows.length;
+  const avgParticipation = participationCount > 0 ? participationSum / participationCount : 0;
+
+  await assignBadges(groupId, {
+    totalKgSeparated,
+    completedWeeks,
+    consecutiveWeeks: completedWeeks,
+    compostWeeks: 0,
+    avgParticipation,
+    onTimeSubmissions,
+    isTop3Monthly: false,
+    isTop1Quarterly: false
   });
 }
 
@@ -203,4 +306,28 @@ export async function assignBadges(groupId: string, input: BadgeInput) {
 
   await supabase.from("group_badges").upsert(payload, { onConflict: "group_id,badge_id" });
   return unlockedCodes;
+}
+
+/**
+ * Recalcula el score (y reevalua insignias) de TODAS las entregas de grupo de
+ * una escuela. Util tras cambios en la logica de puntaje o para refrescar
+ * datos ya cargados sin tener que reaprobar cada evidencia una por una.
+ * Devuelve cuantas entregas se recalcularon.
+ */
+export async function recalcAllScoresForSchool(schoolId: string): Promise<number> {
+  const supabase = createServerSupabase();
+
+  const { data, error } = await supabase
+    .from("submissions")
+    .select("id, groups!inner(school_id)")
+    .eq("groups.school_id", schoolId)
+    .in("status", ["submitted", "approved"]);
+
+  if (error) throw error;
+
+  const ids = (data ?? []).map((row) => row.id as string);
+  for (const id of ids) {
+    await recalcGroupSubmissionScore(id);
+  }
+  return ids.length;
 }

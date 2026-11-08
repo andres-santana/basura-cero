@@ -30,6 +30,8 @@ type Submission = {
     breakdown: Record<string, number>;
   } | null;
   files: Array<{ id: string; path: string; type: string }>;
+  /** Conteo real de archivos = archivos del grupo + fotos de alumnos del reto. */
+  filesCount: number;
 };
 
 type SignedFile = {
@@ -143,7 +145,7 @@ export function AdminReviewQueue() {
       return;
     }
     setExpandedId(submission.id);
-    if (submission.files.length > 0) {
+    if (submission.filesCount > 0) {
       await loadFiles(submission.id);
     }
   };
@@ -241,7 +243,7 @@ export function AdminReviewQueue() {
                   </p>
                 </div>
                 <div className="flex items-center gap-3 text-xs text-slate-600">
-                  <span>{s.files.length} archivo(s)</span>
+                  <span>{s.filesCount} archivo(s)</span>
                   <span>
                     {s.metrics.kgSeparated.toFixed(1)} kg
                   </span>
