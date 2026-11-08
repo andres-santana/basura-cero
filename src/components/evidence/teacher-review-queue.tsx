@@ -18,8 +18,13 @@ type GroupSubmission = {
     endDate: string | null;
   };
   participantsCount: number;
-  metrics: { kgSeparated: number; reusedItems: number };
-  studentTotals: { participants: number; kgSeparated: number; reusedItems: number };
+  metrics: { kgSeparated: number; reusedItems: number; recycledItems: number };
+  studentTotals: {
+    participants: number;
+    kgSeparated: number;
+    reusedItems: number;
+    recycledItems: number;
+  };
   filesCount: number;
 };
 
@@ -66,7 +71,9 @@ export function TeacherReviewQueue() {
   const [filesById, setFilesById] = useState<Record<string, SignedFile[]>>({});
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   // Edicion local de metricas por entrega (kg / materiales).
-  const [edits, setEdits] = useState<Record<string, { kg: string; reused: string }>>({});
+  const [edits, setEdits] = useState<
+    Record<string, { kg: string; reused: string; recycled: string }>
+  >({});
   // Visor de imagenes: lista de imagenes de la entrega abierta + indice activo.
   const [lightboxItems, setLightboxItems] = useState<LightboxItem[]>([]);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
@@ -128,7 +135,8 @@ export function TeacherReviewQueue() {
             ...cur,
             [s.id]: {
               kg: String(s.metrics.kgSeparated),
-              reused: String(s.metrics.reusedItems)
+              reused: String(s.metrics.reusedItems),
+              recycled: String(s.metrics.recycledItems)
             }
           }
     );
@@ -158,11 +166,16 @@ export function TeacherReviewQueue() {
     if (!edit) return;
     const kg = edit.kg.trim() === "" ? 0 : Number(edit.kg);
     const reused = edit.reused.trim() === "" ? 0 : Number(edit.reused);
-    if (Number.isNaN(kg) || Number.isNaN(reused)) {
+    const recycled = edit.recycled.trim() === "" ? 0 : Number(edit.recycled);
+    if (Number.isNaN(kg) || Number.isNaN(reused) || Number.isNaN(recycled)) {
       setError("Revisa los valores de kg y materiales");
       return;
     }
-    const ok = await patch(s, { kgSeparated: kg, reusedItems: reused });
+    const ok = await patch(s, {
+      kgSeparated: kg,
+      reusedItems: reused,
+      recycledItems: recycled
+    });
     if (ok) await load();
   };
 
@@ -236,7 +249,8 @@ export function TeacherReviewQueue() {
           const files = filesById[s.id] ?? [];
           const edit = edits[s.id] ?? {
             kg: String(s.metrics.kgSeparated),
-            reused: String(s.metrics.reusedItems)
+            reused: String(s.metrics.reusedItems),
+            recycled: String(s.metrics.recycledItems)
           };
           return (
             <li key={s.id} className="rounded-xl border bg-white">
@@ -292,6 +306,14 @@ export function TeacherReviewQueue() {
                       </dd>
                     </div>
                     <div>
+                      <dt className="text-xs text-slate-500">
+                        Reciclados (alumnos)
+                      </dt>
+                      <dd className="font-semibold text-slate-800">
+                        {s.studentTotals.recycledItems}
+                      </dd>
+                    </div>
+                    <div>
                       <dt className="text-xs text-slate-500">Alumnos que enviaron</dt>
                       <dd className="font-semibold text-slate-800">
                         {s.studentTotals.participants}
@@ -300,7 +322,7 @@ export function TeacherReviewQueue() {
                   </dl>
 
                   {/* Ajuste de metricas del grupo (override del maestro) */}
-                  <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+                  <div className="grid gap-3 sm:grid-cols-[1fr_1fr_1fr_auto] sm:items-end">
                     <label className="flex flex-col gap-1 text-sm">
                       <span className="text-slate-700">Kg separados (total)</span>
                       <input
@@ -330,6 +352,24 @@ export function TeacherReviewQueue() {
                           setEdits((cur) => ({
                             ...cur,
                             [s.id]: { ...edit, reused: e.target.value }
+                          }))
+                        }
+                        className="rounded-lg border border-slate-300 p-2"
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1 text-sm">
+                      <span className="text-slate-700">
+                        Materiales reciclados (total)
+                      </span>
+                      <input
+                        type="number"
+                        min={0}
+                        step={1}
+                        value={edit.recycled}
+                        onChange={(e) =>
+                          setEdits((cur) => ({
+                            ...cur,
+                            [s.id]: { ...edit, recycled: e.target.value }
                           }))
                         }
                         className="rounded-lg border border-slate-300 p-2"

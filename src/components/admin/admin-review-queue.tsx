@@ -23,6 +23,7 @@ type Submission = {
   metrics: {
     kgSeparated: number;
     reusedItems: number;
+    recycledItems: number;
     wasteReducedEstimate: number;
   };
   score: {
@@ -277,6 +278,7 @@ export function AdminReviewQueue() {
                         <li>Participantes: {s.participantsCount}</li>
                         <li>Kg separados: {s.metrics.kgSeparated.toFixed(2)}</li>
                         <li>Reutilizados: {s.metrics.reusedItems}</li>
+                        <li>Reciclados: {s.metrics.recycledItems}</li>
                         {s.score && (
                           <li className="font-semibold text-emerald-700">
                             Puntaje calculado: {s.score.pointsTotal}

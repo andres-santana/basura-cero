@@ -32,7 +32,7 @@ export async function GET(request: Request) {
          groups!inner(name, grade, school_id),
          weekly_challenges(start_date, end_date, experiments(week_number, title, objective)),
          evidence_files(id, file_path, file_type),
-         impact_metrics(kg_separated, reused_items, waste_reduced_estimate),
+         impact_metrics(kg_separated, reused_items, recycled_items, waste_reduced_estimate),
          scores(points_total, breakdown_json)`
       )
       .eq("groups.school_id", session.schoolId)
@@ -105,6 +105,7 @@ export async function GET(request: Request) {
           metrics: {
             kgSeparated: Number(metrics?.kg_separated ?? 0),
             reusedItems: Number(metrics?.reused_items ?? 0),
+            recycledItems: Number(metrics?.recycled_items ?? 0),
             wasteReducedEstimate: Number(metrics?.waste_reduced_estimate ?? 0)
           },
           score: score

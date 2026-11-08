@@ -27,34 +27,44 @@ export async function scoreSubmission(submissionId: string, metrics: SubmissionM
 }
 
 /**
- * Dias calendario de retraso de una entrega respecto al end_date del reto.
- * Compara solo fechas (YYYY-MM-DD). 0 (o negativo) = en tiempo.
+ * Dias calendario transcurridos desde el INICIO del reto (start_date) hasta la
+ * entrega. Compara solo fechas (YYYY-MM-DD). 0 = mismo dia de inicio; negativo
+ * (entrega antes del inicio, caso raro) se acota a 0.
  */
-export function computeDaysLate(endDate: string, submittedAt: string | null): number {
-  if (!endDate) return 0;
+export function computeDaysElapsed(startDate: string, submittedAt: string | null): number {
+  if (!startDate) return 0;
   const submittedDay = (submittedAt ?? new Date().toISOString()).slice(0, 10);
-  const end = Date.parse(`${endDate.slice(0, 10)}T00:00:00Z`);
+  const start = Date.parse(`${startDate.slice(0, 10)}T00:00:00Z`);
   const got = Date.parse(`${submittedDay}T00:00:00Z`);
-  if (Number.isNaN(end) || Number.isNaN(got)) return 0;
-  const diffDays = Math.round((got - end) / 86_400_000);
+  if (Number.isNaN(start) || Number.isNaN(got)) return 0;
+  const diffDays = Math.round((got - start) / 86_400_000);
   return diffDays > 0 ? diffDays : 0;
 }
 
 /**
  * Agrega el progreso de pasos y mini-juego de los alumnos de un grupo para un
- * reto, usando PROMEDIO ACOTADO (promedio entre alumnos activos del grupo, en
- * 0..1) para no premiar grupos grandes ni castigar grupos pequenos.
+ * reto. Devuelve:
+ * - stepsCompletionRatio / gamesCompletionRatio: PROMEDIO ACOTADO (0..1) entre
+ *   alumnos activos, para el puntaje base del grupo (no premia grupos grandes).
+ * - studentPointsTotal: SUMA de los puntos ganados por cada alumno (pasos
+ *   completados x experiment_steps.points + mini-juegos completados x
+ *   experiment_games.points). Este total crece con el equipo y se agrega al
+ *   score del grupo fuera del tope de 100.
  */
 export async function aggregateStudentProgress(
   groupId: string,
   challengeId: string,
   experimentId: string
-): Promise<{ stepsCompletionRatio: number; gamesCompletionRatio: number }> {
+): Promise<{
+  stepsCompletionRatio: number;
+  gamesCompletionRatio: number;
+  studentPointsTotal: number;
+}> {
   const supabase = createServerSupabase();
 
   const [{ data: students }, { data: steps }, { data: games }] = await Promise.all([
     supabase.from("students").select("id").eq("group_id", groupId).eq("is_active", true),
-    supabase.from("experiment_steps").select("id").eq("experiment_id", experimentId),
+    supabase.from("experiment_steps").select("id, points").eq("experiment_id", experimentId),
     supabase
       .from("experiment_games")
       .select("id, points")
@@ -63,32 +73,42 @@ export async function aggregateStudentProgress(
   ]);
 
   const activeStudents = students ?? [];
-  const totalSteps = (steps ?? []).length;
-  const totalGames = (games ?? []).length;
+  const stepRows = steps ?? [];
+  const gameRows = games ?? [];
+  const totalSteps = stepRows.length;
+  const totalGames = gameRows.length;
 
   if (activeStudents.length === 0 || (totalSteps === 0 && totalGames === 0)) {
-    return { stepsCompletionRatio: 0, gamesCompletionRatio: 0 };
+    return { stepsCompletionRatio: 0, gamesCompletionRatio: 0, studentPointsTotal: 0 };
   }
 
   const studentIds = activeStudents.map((s) => s.id);
+  const stepPointsById = new Map<string, number>(
+    stepRows.map((s) => [s.id as string, Number(s.points ?? 0)])
+  );
+  const gamePointsById = new Map<string, number>(
+    gameRows.map((g) => [g.id as string, Number(g.points ?? 0)])
+  );
 
   const [{ data: stepProgress }, { data: gameProgress }] = await Promise.all([
     supabase
       .from("student_step_progress")
-      .select("student_id")
+      .select("student_id, step_id")
       .eq("challenge_id", challengeId)
       .in("student_id", studentIds),
     supabase
       .from("student_game_progress")
-      .select("student_id, completed_at")
+      .select("student_id, game_id, completed_at")
       .eq("challenge_id", challengeId)
       .in("student_id", studentIds)
   ]);
 
-  // Pasos: promedio del ratio de pasos completados por alumno.
+  // Pasos: promedio del ratio de pasos completados por alumno, y suma de puntos.
   const stepsByStudent = new Map<string, number>();
+  let studentPointsTotal = 0;
   (stepProgress ?? []).forEach((row) => {
     stepsByStudent.set(row.student_id, (stepsByStudent.get(row.student_id) ?? 0) + 1);
+    studentPointsTotal += stepPointsById.get(row.step_id) ?? 0;
   });
   const stepsRatioSum = studentIds.reduce((sum, id) => {
     if (totalSteps === 0) return sum;
@@ -96,7 +116,8 @@ export async function aggregateStudentProgress(
   }, 0);
   const stepsCompletionRatio = totalSteps === 0 ? 0 : stepsRatioSum / activeStudents.length;
 
-  // Juegos: promedio de "completado" (completed_at no nulo) por alumno.
+  // Juegos: promedio de "completado" (completed_at no nulo) por alumno, y suma
+  // de puntos de los juegos completados.
   const completedGamesByStudent = new Map<string, number>();
   (gameProgress ?? []).forEach((row) => {
     if (row.completed_at) {
@@ -104,6 +125,7 @@ export async function aggregateStudentProgress(
         row.student_id,
         (completedGamesByStudent.get(row.student_id) ?? 0) + 1
       );
+      studentPointsTotal += gamePointsById.get(row.game_id) ?? 0;
     }
   });
   const gamesRatioSum = studentIds.reduce((sum, id) => {
@@ -112,7 +134,7 @@ export async function aggregateStudentProgress(
   }, 0);
   const gamesCompletionRatio = totalGames === 0 ? 0 : gamesRatioSum / activeStudents.length;
 
-  return { stepsCompletionRatio, gamesCompletionRatio };
+  return { stepsCompletionRatio, gamesCompletionRatio, studentPointsTotal };
 }
 
 type GroupSubmissionRow = {
@@ -123,12 +145,12 @@ type GroupSubmissionRow = {
   submitted_at: string | null;
   status: string;
   weekly_challenges:
-    | { end_date: string; experiment_id: string }
-    | { end_date: string; experiment_id: string }[]
+    | { start_date: string; end_date: string; experiment_id: string }
+    | { start_date: string; end_date: string; experiment_id: string }[]
     | null;
   impact_metrics:
-    | { kg_separated: number; reused_items: number }
-    | { kg_separated: number; reused_items: number }[]
+    | { kg_separated: number; reused_items: number; recycled_items: number }
+    | { kg_separated: number; reused_items: number; recycled_items: number }[]
     | null;
   evidence_files: { id: string }[] | null;
 };
@@ -149,7 +171,7 @@ export async function recalcGroupSubmissionScore(submissionId: string): Promise<
   const { data, error } = await supabase
     .from("submissions")
     .select(
-      "id, group_id, challenge_id, participants_count, submitted_at, status, weekly_challenges(end_date, experiment_id), impact_metrics(kg_separated, reused_items), evidence_files(id)"
+      "id, group_id, challenge_id, participants_count, submitted_at, status, weekly_challenges(start_date, end_date, experiment_id), impact_metrics(kg_separated, reused_items, recycled_items), evidence_files(id)"
     )
     .eq("id", submissionId)
     .maybeSingle();
@@ -172,24 +194,26 @@ export async function recalcGroupSubmissionScore(submissionId: string): Promise<
   );
   const filesCount = groupFilesCount + studentFilesCount;
 
-  const daysLate = challenge ? computeDaysLate(challenge.end_date, row.submitted_at) : 0;
+  const daysElapsed = challenge ? computeDaysElapsed(challenge.start_date, row.submitted_at) : 0;
 
   const progress = challenge
     ? await aggregateStudentProgress(row.group_id, row.challenge_id, challenge.experiment_id)
-    : { stepsCompletionRatio: 0, gamesCompletionRatio: 0 };
+    : { stepsCompletionRatio: 0, gamesCompletionRatio: 0, studentPointsTotal: 0 };
 
   await scoreSubmission(submissionId, {
     participantsCount: row.participants_count ?? 0,
     expectedParticipants: Math.max(row.participants_count ?? 0, 1),
     kgSeparated: Number(metrics?.kg_separated ?? 0),
     reusedItems: Number(metrics?.reused_items ?? 0),
+    recycledItems: Number(metrics?.recycled_items ?? 0),
     creativityScore: 0,
     teamworkScore: 0,
     hasEvidenceFile: filesCount > 0,
-    daysLate,
-    isOnTime: daysLate === 0,
+    daysElapsed,
+    isOnTime: daysElapsed === 0,
     stepsCompletionRatio: progress.stepsCompletionRatio,
-    gamesCompletionRatio: progress.gamesCompletionRatio
+    gamesCompletionRatio: progress.gamesCompletionRatio,
+    studentPointsTotal: progress.studentPointsTotal
   });
 
   // Tras recalcular el score, reevalua las insignias del grupo para que el
@@ -261,8 +285,15 @@ export async function assignBadgesForGroup(groupId: string): Promise<void> {
         | { breakdown_json: Record<string, number> | null }[]
         | null
     );
-    const daysLate = Number(score?.breakdown_json?.daysLate ?? 0);
-    if (daysLate <= 0) onTimeSubmissions += 1;
+    // Compat: breakdowns nuevos guardan daysElapsed (dias desde el inicio);
+    // los antiguos guardaban daysLate (dias tras end_date). Se considera "en
+    // tiempo" cuando la entrega ocurrio dentro de los primeros dias del reto
+    // (factor temporal alto) o, para datos antiguos, sin retraso.
+    const breakdown = score?.breakdown_json ?? {};
+    const daysElapsed = Number(
+      breakdown.daysElapsed ?? breakdown.daysLate ?? 0
+    );
+    if (daysElapsed <= 3) onTimeSubmissions += 1;
 
     const participants = Number((sub as { participants_count: number | null }).participants_count ?? 0);
     if (participants > 0) {

@@ -12,6 +12,7 @@ type StudentSubmission = {
   comments: string | null;
   kgSeparated: number;
   reusedItems: number;
+  recycledItems: number;
   student: { alias: string; grade: string | null };
   group: { id: string; name: string | null };
   weekNumber: number | null;
@@ -56,7 +57,9 @@ export function StudentEvidenceReview() {
   const [filesById, setFilesById] = useState<Record<string, SignedFile[]>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
   // Edicion local de metricas por alumno (kg / materiales).
-  const [edits, setEdits] = useState<Record<string, { kg: string; reused: string }>>({});
+  const [edits, setEdits] = useState<
+    Record<string, { kg: string; reused: string; recycled: string }>
+  >({});
   // Visor de imagenes.
   const [lightboxItems, setLightboxItems] = useState<LightboxItem[]>([]);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
@@ -112,7 +115,14 @@ export function StudentEvidenceReview() {
     setEdits((cur) =>
       cur[s.id]
         ? cur
-        : { ...cur, [s.id]: { kg: String(s.kgSeparated), reused: String(s.reusedItems) } }
+        : {
+            ...cur,
+            [s.id]: {
+              kg: String(s.kgSeparated),
+              reused: String(s.reusedItems),
+              recycled: String(s.recycledItems)
+            }
+          }
     );
     if (s.filesCount > 0) await loadFiles(s.id);
   };
@@ -144,11 +154,16 @@ export function StudentEvidenceReview() {
     if (!edit) return;
     const kg = edit.kg.trim() === "" ? 0 : Number(edit.kg);
     const reused = edit.reused.trim() === "" ? 0 : Number(edit.reused);
-    if (Number.isNaN(kg) || Number.isNaN(reused)) {
+    const recycled = edit.recycled.trim() === "" ? 0 : Number(edit.recycled);
+    if (Number.isNaN(kg) || Number.isNaN(reused) || Number.isNaN(recycled)) {
       setError("Revisa los valores de kg y materiales");
       return;
     }
-    const ok = await patch(s, { kgSeparated: kg, reusedItems: reused });
+    const ok = await patch(s, {
+      kgSeparated: kg,
+      reusedItems: reused,
+      recycledItems: recycled
+    });
     if (ok) await load();
   };
 
@@ -190,7 +205,8 @@ export function StudentEvidenceReview() {
           const files = filesById[s.id] ?? [];
           const edit = edits[s.id] ?? {
             kg: String(s.kgSeparated),
-            reused: String(s.reusedItems)
+            reused: String(s.reusedItems),
+            recycled: String(s.recycledItems)
           };
           return (
             <li key={s.id} className="rounded-xl border bg-white">
@@ -207,7 +223,8 @@ export function StudentEvidenceReview() {
                   </div>
                   <p className="mt-1 text-xs text-slate-500">
                     Semana {s.weekNumber ?? "?"} · {s.experimentTitle ?? "Sin reto"} ·{" "}
-                    {s.filesCount} foto(s) · {s.kgSeparated} kg · {s.reusedItems} reutilizados
+                    {s.filesCount} foto(s) · {s.kgSeparated} kg · {s.reusedItems}{" "}
+                    reutilizados · {s.recycledItems} reciclados
                   </p>
                 </div>
               </button>
@@ -217,7 +234,7 @@ export function StudentEvidenceReview() {
                   {s.comments && <p className="text-sm text-slate-700">{s.comments}</p>}
 
                   {/* Metricas reportadas por el alumno, editables por el maestro */}
-                  <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+                  <div className="grid gap-3 sm:grid-cols-2 sm:items-end lg:grid-cols-[1fr_1fr_1fr_auto]">
                     <label className="flex flex-col gap-1 text-sm">
                       <span className="text-slate-700">Kg separados</span>
                       <input
@@ -250,6 +267,22 @@ export function StudentEvidenceReview() {
                         className="rounded-lg border border-slate-300 p-2"
                       />
                     </label>
+                    <label className="flex flex-col gap-1 text-sm">
+                      <span className="text-slate-700">Materiales reciclados</span>
+                      <input
+                        type="number"
+                        min={0}
+                        step={1}
+                        value={edit.recycled}
+                        onChange={(e) =>
+                          setEdits((cur) => ({
+                            ...cur,
+                            [s.id]: { ...edit, recycled: e.target.value }
+                          }))
+                        }
+                        className="rounded-lg border border-slate-300 p-2"
+                      />
+                    </label>
                     <button
                       type="button"
                       disabled={busyId === s.id}
@@ -260,9 +293,9 @@ export function StudentEvidenceReview() {
                     </button>
                   </div>
                   <p className="text-[11px] text-slate-400">
-                    El alumno reporto {s.kgSeparated} kg y {s.reusedItems} materiales.
-                    Ajustalo si el dato no es real. Las evidencias rechazadas no suman
-                    al total del grupo.
+                    El alumno reporto {s.kgSeparated} kg, {s.reusedItems} reutilizados y{" "}
+                    {s.recycledItems} reciclados. Ajustalo si el dato no es real. Las
+                    evidencias rechazadas no suman al total del grupo.
                   </p>
 
                   <div className="flex flex-wrap gap-3">

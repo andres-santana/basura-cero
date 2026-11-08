@@ -9,20 +9,29 @@ export type SubmissionMetrics = {
   expectedParticipants: number;
   kgSeparated: number;
   reusedItems: number;
+  /** Objetos reciclados reportados (conteo). */
+  recycledItems?: number;
   creativityScore: number;
   teamworkScore: number;
   hasEvidenceFile: boolean;
   /**
-   * Dias calendario de retraso respecto al end_date del reto (0 = en tiempo).
-   * Si se omite, se deriva de isOnTime (0 cuando en tiempo, 1 cuando tarde)
-   * para mantener compatibilidad con llamadores antiguos.
+   * Dias calendario transcurridos desde el start_date del reto hasta la
+   * entrega (0 = mismo dia de inicio). Si se omite, se deriva de isOnTime
+   * (0 cuando en tiempo, 1 cuando tarde) para mantener compatibilidad con
+   * llamadores antiguos.
    */
-  daysLate?: number;
+  daysElapsed?: number;
   isOnTime: boolean;
   /** Proporcion de pasos completados por el grupo (0..1). */
   stepsCompletionRatio?: number;
   /** Proporcion de desempeno del mini-juego (0..1). */
   gamesCompletionRatio?: number;
+  /**
+   * Suma de los puntos de cada alumno del grupo (pasos + mini-juegos
+   * completados) para este reto. Se agrega como bloque aparte, fuera del
+   * presupuesto de 100 y sin aplicarle el factor de tiempo.
+   */
+  studentPointsTotal?: number;
 };
 
 export type ScoreResult = {
@@ -44,8 +53,15 @@ export function calculateScore(
       : 0;
 
   const participationPoints = clamp(Math.round(participationPct / 10), 0, weights.participationMax);
-  const wasteReductionPoints = clamp(Math.floor(metrics.kgSeparated), 0, weights.wasteReductionMax);
+  // Impacto por kg separados: medio punto por kg (0.5 pt/kg) para un gradiente
+  // mas fino que el "floor" plano anterior, hasta el tope del peso.
+  const wasteReductionPoints = clamp(
+    Math.round(metrics.kgSeparated * 0.5 * 10) / 10,
+    0,
+    weights.wasteReductionMax
+  );
   const reusePoints = clamp(metrics.reusedItems, 0, weights.reusedItemsMax);
+  const recyclePoints = clamp(metrics.recycledItems ?? 0, 0, weights.recycledItemsMax);
   const creativityPoints = clamp(metrics.creativityScore, 0, weights.creativityMax);
   const teamworkPoints = clamp(metrics.teamworkScore, 0, weights.teamworkMax);
   const experimentPoints = weights.experimentCompleted;
@@ -64,14 +80,23 @@ export function calculateScore(
     participationPoints +
     wasteReductionPoints +
     reusePoints +
+    recyclePoints +
     creativityPoints +
     teamworkPoints;
 
-  // Factor temporal por tramos (reemplaza el castigo plano de 10%).
-  const daysLate = metrics.daysLate ?? (metrics.isOnTime ? 0 : 1);
-  const factor = timeDecayFactor(daysLate);
+  // Factor por tiempo de respuesta (dias desde el inicio del reto). Solo aplica
+  // al puntaje base del grupo (tope 100).
+  const daysElapsed = metrics.daysElapsed ?? (metrics.isOnTime ? 0 : 1);
+  const factor = timeDecayFactor(daysElapsed);
 
-  const pointsTotal = clamp(Math.round(subtotal * factor), 0, 100);
+  const basePoints = clamp(Math.round(subtotal * factor), 0, 100);
+
+  // Puntos de alumnos (pasos + mini-juegos completados): se suman aparte, sin
+  // tope de 100 y sin factor de tiempo, para diferenciar el esfuerzo real del
+  // equipo. Pueden llevar el total por encima de 100.
+  const studentPoints = Math.max(0, Math.round(metrics.studentPointsTotal ?? 0));
+
+  const pointsTotal = basePoints + studentPoints;
 
   return {
     pointsTotal,
@@ -83,11 +108,14 @@ export function calculateScore(
       participation: participationPoints,
       wasteReduction: wasteReductionPoints,
       reusedItems: reusePoints,
+      recycledItems: recyclePoints,
       creativity: creativityPoints,
       teamwork: teamworkPoints,
       subtotal,
-      daysLate,
-      timeFactor: factor
+      daysElapsed,
+      timeFactor: factor,
+      basePoints,
+      studentPoints
     }
   };
 }

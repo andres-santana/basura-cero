@@ -10,6 +10,7 @@ const schema = z.object({
   // Ajuste opcional del maestro sobre las metricas derivadas de los alumnos.
   kgSeparated: z.coerce.number().min(0).max(100000).optional(),
   reusedItems: z.coerce.number().int().min(0).max(1000000).optional(),
+  recycledItems: z.coerce.number().int().min(0).max(1000000).optional(),
   comments: z.string().trim().max(1000).optional()
 });
 
@@ -38,6 +39,7 @@ export async function PATCH(
       parsed.data.status === undefined &&
       parsed.data.kgSeparated === undefined &&
       parsed.data.reusedItems === undefined &&
+      parsed.data.recycledItems === undefined &&
       parsed.data.comments === undefined
     ) {
       return NextResponse.json({ error: "Nada que actualizar" }, { status: 400 });
@@ -78,7 +80,11 @@ export async function PATCH(
     }
 
     // Ajuste manual de metricas (override del maestro sobre la suma de alumnos).
-    if (parsed.data.kgSeparated !== undefined || parsed.data.reusedItems !== undefined) {
+    if (
+      parsed.data.kgSeparated !== undefined ||
+      parsed.data.reusedItems !== undefined ||
+      parsed.data.recycledItems !== undefined
+    ) {
       const metricsPatch: Record<string, unknown> = {
         updated_at: new Date().toISOString()
       };
@@ -88,6 +94,9 @@ export async function PATCH(
       }
       if (parsed.data.reusedItems !== undefined) {
         metricsPatch.reused_items = parsed.data.reusedItems;
+      }
+      if (parsed.data.recycledItems !== undefined) {
+        metricsPatch.recycled_items = parsed.data.recycledItems;
       }
       const { error: metricsError } = await supabase
         .from("impact_metrics")
