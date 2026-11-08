@@ -17,11 +17,15 @@ alter table impact_metrics
 alter table student_submissions
   add column if not exists recycled_items int not null default 0;
 
--- Recrear vistas de impacto para incluir recycled_items. Se preservan las
--- columnas existentes para no romper los consumidores actuales; solo se agregan
--- las nuevas columnas de reciclaje.
+-- Recrear vistas de impacto para incluir recycled_items. Insertamos la nueva
+-- columna en medio de la lista, por lo que CREATE OR REPLACE VIEW no basta
+-- (Postgres solo permite agregar columnas al final). Se dropean y recrean; el
+-- orden importa porque v_school_summary depende de v_weekly_impact.
 
-create or replace view v_weekly_impact as
+drop view if exists v_school_summary;
+drop view if exists v_weekly_impact;
+
+create view v_weekly_impact as
 select
   wc.school_id,
   e.week_number,
@@ -37,7 +41,7 @@ left join submissions s on s.challenge_id = wc.id and s.status in ('submitted','
 left join impact_metrics im on im.submission_id = s.id
 group by wc.school_id, e.week_number;
 
-create or replace view v_school_summary as
+create view v_school_summary as
 select
   sc.id as school_id,
   sc.name as school_name,
