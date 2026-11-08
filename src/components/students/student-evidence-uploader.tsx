@@ -15,6 +15,7 @@ type ExistingSubmission = {
   comments: string | null;
   kgSeparated: number;
   reusedItems: number;
+  recycledItems: number;
   filesCount: number;
 };
 
@@ -32,6 +33,7 @@ export function StudentEvidenceUploader() {
   const [comments, setComments] = useState("");
   const [kgSeparated, setKgSeparated] = useState("");
   const [reusedItems, setReusedItems] = useState("");
+  const [recycledItems, setRecycledItems] = useState("");
   const [existing, setExisting] = useState<ExistingSubmission | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -119,6 +121,7 @@ export function StudentEvidenceUploader() {
           comments: comments.trim() || undefined,
           kgSeparated: kgSeparated.trim() === "" ? 0 : Number(kgSeparated),
           reusedItems: reusedItems.trim() === "" ? 0 : Number(reusedItems),
+          recycledItems: recycledItems.trim() === "" ? 0 : Number(recycledItems),
           files: uploaded
         })
       });
@@ -130,6 +133,7 @@ export function StudentEvidenceUploader() {
       setComments("");
       setKgSeparated("");
       setReusedItems("");
+      setRecycledItems("");
       if (fileInputRef.current) fileInputRef.current.value = "";
       await load();
     } catch (err) {
@@ -162,7 +166,8 @@ export function StudentEvidenceUploader() {
           Tu evidencia: <strong>{STATUS_LABEL[existing.status]}</strong>
           {existing.filesCount > 0 && <span>({existing.filesCount} foto(s))</span>}
           <span className="text-emerald-700">
-            · {existing.kgSeparated} kg · {existing.reusedItems} cosas reutilizadas
+            · {existing.kgSeparated} kg · {existing.reusedItems} reutilizadas ·{" "}
+            {existing.recycledItems} recicladas
           </span>
         </div>
       )}
@@ -257,6 +262,26 @@ export function StudentEvidenceUploader() {
             <span className="text-xs text-slate-500">
               Cuenta los objetos que volviste a usar en vez de tirarlos (botellas,
               frascos, cajas...).
+            </span>
+          </label>
+
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="font-semibold text-slate-700">
+              Cuantas cosas reciclaste?
+            </span>
+            <input
+              type="number"
+              inputMode="numeric"
+              min={0}
+              step={1}
+              value={recycledItems}
+              onChange={(e) => setRecycledItems(e.target.value)}
+              className="rounded-xl border border-slate-300 p-2 text-lg"
+              placeholder="2"
+            />
+            <span className="text-xs text-slate-500">
+              Cuenta los objetos que entregaste para reciclar (latas, papel,
+              plastico que ya no sirve para reutilizar...).
             </span>
           </label>
         </div>

@@ -7,7 +7,8 @@ import { syncGroupMetricsFromStudents } from "@/lib/services/teacher-evidence";
 const schema = z.object({
   status: z.enum(["submitted", "approved", "rejected"]).optional(),
   kgSeparated: z.coerce.number().min(0).max(1000).optional(),
-  reusedItems: z.coerce.number().int().min(0).max(10000).optional()
+  reusedItems: z.coerce.number().int().min(0).max(10000).optional(),
+  recycledItems: z.coerce.number().int().min(0).max(10000).optional()
 });
 
 export async function PATCH(
@@ -25,7 +26,8 @@ export async function PATCH(
     if (
       parsed.data.status === undefined &&
       parsed.data.kgSeparated === undefined &&
-      parsed.data.reusedItems === undefined
+      parsed.data.reusedItems === undefined &&
+      parsed.data.recycledItems === undefined
     ) {
       return NextResponse.json({ error: "Nada que actualizar" }, { status: 400 });
     }
@@ -50,6 +52,7 @@ export async function PATCH(
     if (parsed.data.status !== undefined) patch.status = parsed.data.status;
     if (parsed.data.kgSeparated !== undefined) patch.kg_separated = parsed.data.kgSeparated;
     if (parsed.data.reusedItems !== undefined) patch.reused_items = parsed.data.reusedItems;
+    if (parsed.data.recycledItems !== undefined) patch.recycled_items = parsed.data.recycledItems;
 
     const { error } = await supabase
       .from("student_submissions")

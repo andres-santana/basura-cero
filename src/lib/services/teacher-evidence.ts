@@ -20,12 +20,13 @@ export type TeacherGroupSubmission = {
   participantsCount: number;
   /** Metricas del grupo. Por defecto suman lo reportado por los alumnos; el
    *  maestro puede ajustarlas al revisar. */
-  metrics: { kgSeparated: number; reusedItems: number };
+  metrics: { kgSeparated: number; reusedItems: number; recycledItems: number };
   /** Totales derivados de alumnos (referencia para el maestro). */
   studentTotals: {
     participants: number;
     kgSeparated: number;
     reusedItems: number;
+    recycledItems: number;
   };
   /** Numero de fotos de alumnos asociadas al reto en este grupo. */
   filesCount: number;
@@ -45,6 +46,7 @@ type StudentSubmissionRow = {
   submitted_at: string | null;
   kg_separated: number | null;
   reused_items: number | null;
+  recycled_items: number | null;
   student_evidence_files: { id: string }[] | null;
   groups:
     | { name: string | null; grade: string | null; school_id: string; teachers: { user_id: string } | { user_id: string }[] | null }
@@ -75,6 +77,7 @@ type DerivedAggregate = {
   participants: number;
   kgSeparated: number;
   reusedItems: number;
+  recycledItems: number;
   filesCount: number;
   /** submitted_at mas reciente entre las evidencias de alumnos. */
   latestSubmittedAt: string | null;
@@ -107,6 +110,7 @@ function aggregateStudentRows(rows: StudentSubmissionRow[]): Map<DerivedKey, Der
         participants: 0,
         kgSeparated: 0,
         reusedItems: 0,
+        recycledItems: 0,
         filesCount: 0,
         latestSubmittedAt: null
       } satisfies DerivedAggregate);
@@ -118,6 +122,7 @@ function aggregateStudentRows(rows: StudentSubmissionRow[]): Map<DerivedKey, Der
       existing.participants += 1;
       existing.kgSeparated += Number(row.kg_separated ?? 0);
       existing.reusedItems += Number(row.reused_items ?? 0);
+      existing.recycledItems += Number(row.recycled_items ?? 0);
     }
     existing.filesCount += Array.isArray(row.student_evidence_files)
       ? row.student_evidence_files.length
@@ -151,7 +156,7 @@ export async function ensureGroupSubmissionsFromStudents(
   const { data: studentData, error: studentError } = await supabase
     .from("student_submissions")
     .select(
-      `id, challenge_id, group_id, status, submitted_at, kg_separated, reused_items,
+      `id, challenge_id, group_id, status, submitted_at, kg_separated, reused_items, recycled_items,
        student_evidence_files(id),
        groups!inner(name, grade, school_id, teachers(user_id)),
        weekly_challenges(end_date, experiments(week_number, title))`
@@ -179,7 +184,7 @@ export async function ensureGroupSubmissionsFromStudents(
   const { data: existingSubs, error: existingError } = await supabase
     .from("submissions")
     .select(
-      "id, group_id, challenge_id, status, comments, submitted_at, participants_count, impact_metrics(kg_separated, reused_items)"
+      "id, group_id, challenge_id, status, comments, submitted_at, participants_count, impact_metrics(kg_separated, reused_items, recycled_items)"
     )
     .in("group_id", groupIds)
     .in("challenge_id", challengeIds);
@@ -193,14 +198,18 @@ export async function ensureGroupSubmissionsFromStudents(
       comments: string | null;
       submitted_at: string | null;
       participants_count: number | null;
-      metrics: { kg_separated: number | null; reused_items: number | null } | null;
+      metrics: {
+        kg_separated: number | null;
+        reused_items: number | null;
+        recycled_items: number | null;
+      } | null;
     }
   >();
   for (const sub of existingSubs ?? []) {
     const metrics = pickOne(
       (sub as { impact_metrics: unknown }).impact_metrics as
-        | { kg_separated: number | null; reused_items: number | null }
-        | { kg_separated: number | null; reused_items: number | null }[]
+        | { kg_separated: number | null; reused_items: number | null; recycled_items: number | null }
+        | { kg_separated: number | null; reused_items: number | null; recycled_items: number | null }[]
         | null
     );
     existingByKey.set(`${sub.group_id}:${sub.challenge_id}`, {
@@ -256,6 +265,7 @@ export async function ensureGroupSubmissionsFromStudents(
         submission_id: upserted.id,
         kg_separated: agg.kgSeparated,
         reused_items: agg.reusedItems,
+        recycled_items: agg.recycledItems,
         waste_reduced_estimate: agg.kgSeparated
       },
       { onConflict: "submission_id" }
@@ -272,7 +282,11 @@ export async function ensureGroupSubmissionsFromStudents(
           comments: upserted.comments,
           submitted_at: upserted.submitted_at,
           participants_count: upserted.participants_count,
-          metrics: { kg_separated: agg.kgSeparated, reused_items: agg.reusedItems }
+          metrics: {
+            kg_separated: agg.kgSeparated,
+            reused_items: agg.reusedItems,
+            recycled_items: agg.recycledItems
+          }
         },
         agg
       )
@@ -296,7 +310,11 @@ function toTeacherSubmission(
     comments: string | null;
     submitted_at: string | null;
     participants_count: number | null;
-    metrics: { kg_separated: number | null; reused_items: number | null } | null;
+    metrics: {
+      kg_separated: number | null;
+      reused_items: number | null;
+      recycled_items: number | null;
+    } | null;
   },
   agg: DerivedAggregate
 ): TeacherGroupSubmission {
@@ -315,12 +333,14 @@ function toTeacherSubmission(
     participantsCount: existing.participants_count ?? agg.participants,
     metrics: {
       kgSeparated: Number(existing.metrics?.kg_separated ?? agg.kgSeparated),
-      reusedItems: Number(existing.metrics?.reused_items ?? agg.reusedItems)
+      reusedItems: Number(existing.metrics?.reused_items ?? agg.reusedItems),
+      recycledItems: Number(existing.metrics?.recycled_items ?? agg.recycledItems)
     },
     studentTotals: {
       participants: agg.participants,
       kgSeparated: agg.kgSeparated,
-      reusedItems: agg.reusedItems
+      reusedItems: agg.reusedItems,
+      recycledItems: agg.recycledItems
     },
     filesCount: agg.filesCount
   };
@@ -351,18 +371,20 @@ export async function syncGroupMetricsFromStudents(
 
   const { data: studentRows } = await supabase
     .from("student_submissions")
-    .select("status, kg_separated, reused_items")
+    .select("status, kg_separated, reused_items, recycled_items")
     .eq("group_id", groupId)
     .eq("challenge_id", challengeId);
 
   let participants = 0;
   let kg = 0;
   let reused = 0;
+  let recycled = 0;
   for (const row of studentRows ?? []) {
     if (row.status === "submitted" || row.status === "approved") {
       participants += 1;
       kg += Number(row.kg_separated ?? 0);
       reused += Number(row.reused_items ?? 0);
+      recycled += Number(row.recycled_items ?? 0);
     }
   }
 
@@ -381,6 +403,7 @@ export async function syncGroupMetricsFromStudents(
         submission_id: groupSub.id,
         kg_separated: kg,
         reused_items: reused,
+        recycled_items: recycled,
         waste_reduced_estimate: kg
       },
       { onConflict: "submission_id" }
