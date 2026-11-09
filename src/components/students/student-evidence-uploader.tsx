@@ -16,7 +16,15 @@ type ExistingSubmission = {
   kgSeparated: number;
   reusedItems: number;
   recycledItems: number;
+  materialQuantities: Record<string, number>;
   filesCount: number;
+};
+
+type ChallengeMaterial = {
+  id: string;
+  label: string;
+  unitLabel: string;
+  kind: "separado" | "reutilizado" | "reciclado";
 };
 
 const STATUS_LABEL: Record<ExistingSubmission["status"], string> = {
@@ -34,6 +42,8 @@ export function StudentEvidenceUploader() {
   const [kgSeparated, setKgSeparated] = useState("");
   const [reusedItems, setReusedItems] = useState("");
   const [recycledItems, setRecycledItems] = useState("");
+  const [materials, setMaterials] = useState<ChallengeMaterial[]>([]);
+  const [materialQty, setMaterialQty] = useState<Record<string, string>>({});
   const [existing, setExisting] = useState<ExistingSubmission | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -55,7 +65,20 @@ export function StudentEvidenceUploader() {
       return;
     }
     const payload = await res.json();
-    if (res.ok) setExisting(payload.data ?? null);
+    if (res.ok) {
+      setExisting(payload.data ?? null);
+      setMaterials(payload.materials ?? []);
+      const saved = payload.data?.materialQuantities as
+        | Record<string, number>
+        | undefined;
+      if (saved) {
+        const asStrings: Record<string, string> = {};
+        for (const [id, qty] of Object.entries(saved)) {
+          if (qty > 0) asStrings[id] = String(qty);
+        }
+        setMaterialQty(asStrings);
+      }
+    }
   }, [router]);
 
   useEffect(() => {
@@ -122,6 +145,13 @@ export function StudentEvidenceUploader() {
           kgSeparated: kgSeparated.trim() === "" ? 0 : Number(kgSeparated),
           reusedItems: reusedItems.trim() === "" ? 0 : Number(reusedItems),
           recycledItems: recycledItems.trim() === "" ? 0 : Number(recycledItems),
+          materials: materials.map((m) => ({
+            materialId: m.id,
+            quantity:
+              (materialQty[m.id] ?? "").trim() === ""
+                ? 0
+                : Number(materialQty[m.id])
+          })),
           files: uploaded
         })
       });
@@ -134,6 +164,7 @@ export function StudentEvidenceUploader() {
       setKgSeparated("");
       setReusedItems("");
       setRecycledItems("");
+      setMaterialQty({});
       if (fileInputRef.current) fileInputRef.current.value = "";
       await load();
     } catch (err) {
@@ -224,6 +255,40 @@ export function StudentEvidenceUploader() {
           </ul>
         )}
 
+        {materials.length > 0 && (
+          <div className="mt-4 space-y-3 rounded-2xl border-2 border-emerald-200 bg-emerald-50/50 p-4">
+            <p className="text-sm font-semibold text-slate-700">
+              Cuenta lo que juntaste
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {materials.map((m) => (
+                <label key={m.id} className="flex flex-col gap-1 text-sm">
+                  <span className="font-semibold text-slate-700">
+                    Cuantas {m.unitLabel} de {m.label}?
+                  </span>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    min={0}
+                    step={1}
+                    value={materialQty[m.id] ?? ""}
+                    onChange={(e) =>
+                      setMaterialQty((cur) => ({ ...cur, [m.id]: e.target.value }))
+                    }
+                    className="rounded-xl border border-slate-300 p-2 text-lg"
+                    placeholder="0"
+                  />
+                </label>
+              ))}
+            </div>
+            <p className="text-xs text-slate-500">
+              Cuenta cuantas piezas juntaste de cada material. Tu maestra o maestro
+              vera el total.
+            </p>
+          </div>
+        )}
+
+        {materials.length === 0 && (
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <label className="flex flex-col gap-1 text-sm">
             <span className="font-semibold text-slate-700">
@@ -285,6 +350,7 @@ export function StudentEvidenceUploader() {
             </span>
           </label>
         </div>
+        )}
 
         <label className="mt-4 flex flex-col gap-1 text-sm">
           <span className="text-slate-700">Cuentanos que hiciste (opcional)</span>

@@ -20,6 +20,13 @@ export type StudentGame = {
   score: number;
 };
 
+export type StudentMaterial = {
+  id: string;
+  label: string;
+  unitLabel: string;
+  kind: "separado" | "reutilizado" | "reciclado";
+};
+
 export type StudentChallengeView = {
   challenge: {
     id: string;

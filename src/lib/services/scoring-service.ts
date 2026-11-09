@@ -149,8 +149,8 @@ type GroupSubmissionRow = {
     | { start_date: string; end_date: string; experiment_id: string }[]
     | null;
   impact_metrics:
-    | { kg_separated: number; reused_items: number; recycled_items: number }
-    | { kg_separated: number; reused_items: number; recycled_items: number }[]
+    | { kg_separated: number; reused_items: number; recycled_items: number; equivalent_kg: number }
+    | { kg_separated: number; reused_items: number; recycled_items: number; equivalent_kg: number }[]
     | null;
   evidence_files: { id: string }[] | null;
 };
@@ -171,7 +171,7 @@ export async function recalcGroupSubmissionScore(submissionId: string): Promise<
   const { data, error } = await supabase
     .from("submissions")
     .select(
-      "id, group_id, challenge_id, participants_count, submitted_at, status, weekly_challenges(start_date, end_date, experiment_id), impact_metrics(kg_separated, reused_items, recycled_items), evidence_files(id)"
+      "id, group_id, challenge_id, participants_count, submitted_at, status, weekly_challenges(start_date, end_date, experiment_id), impact_metrics(kg_separated, reused_items, recycled_items, equivalent_kg), evidence_files(id)"
     )
     .eq("id", submissionId)
     .maybeSingle();
@@ -200,12 +200,21 @@ export async function recalcGroupSubmissionScore(submissionId: string): Promise<
     ? await aggregateStudentProgress(row.group_id, row.challenge_id, challenge.experiment_id)
     : { stepsCompletionRatio: 0, gamesCompletionRatio: 0, studentPointsTotal: 0 };
 
+  // Fase 2: si el experimento tiene catalogo de materiales activos, el impacto
+  // se puntua sobre kg equivalentes (equivalent_kg) y NO sobre los conteos
+  // sueltos, para no contar doble. Sin catalogo, se usa el fallback de Fase 1.
+  const usesMaterialCatalog = challenge
+    ? await experimentHasMaterials(challenge.experiment_id)
+    : false;
+
   await scoreSubmission(submissionId, {
     participantsCount: row.participants_count ?? 0,
     expectedParticipants: Math.max(row.participants_count ?? 0, 1),
     kgSeparated: Number(metrics?.kg_separated ?? 0),
     reusedItems: Number(metrics?.reused_items ?? 0),
     recycledItems: Number(metrics?.recycled_items ?? 0),
+    equivalentKg: Number(metrics?.equivalent_kg ?? 0),
+    usesMaterialCatalog,
     creativityScore: 0,
     teamworkScore: 0,
     hasEvidenceFile: filesCount > 0,
@@ -221,6 +230,22 @@ export async function recalcGroupSubmissionScore(submissionId: string): Promise<
   await assignBadgesForGroup(row.group_id).catch(() => {
     /* las insignias son best-effort: no deben romper el guardado del score */
   });
+}
+
+/**
+ * Indica si un experimento tiene al menos un material activo en su catalogo
+ * (Fase 2). Determina si el impacto se puntua por kg equivalentes o por el
+ * fallback de conteos (Fase 1).
+ */
+async function experimentHasMaterials(experimentId: string): Promise<boolean> {
+  const supabase = createServerSupabase();
+  const { count, error } = await supabase
+    .from("experiment_materials")
+    .select("id", { count: "exact", head: true })
+    .eq("experiment_id", experimentId)
+    .eq("is_active", true);
+  if (error) return false;
+  return (count ?? 0) > 0;
 }
 
 /**
