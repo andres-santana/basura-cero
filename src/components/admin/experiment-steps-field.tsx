@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, Loader2, Plus, Save, Trash2 } from "lucide-react";
 import { getErrorMessage } from "@/lib/error-message";
 
@@ -13,6 +13,8 @@ type Step = {
   completedCount: number;
 };
 
+type StepEdit = { title: string; description: string; points: string };
+
 type Props = {
   experimentId: string;
   disabled?: boolean;
@@ -22,10 +24,14 @@ const EMPTY_DRAFT = { title: "", description: "", points: "5" };
 
 export function ExperimentStepsField({ experimentId, disabled = false }: Props) {
   const [steps, setSteps] = useState<Step[]>([]);
-  // Ediciones locales por paso, aun no guardadas.
-  const [edits, setEdits] = useState<
-    Record<string, { title: string; description: string; points: string }>
-  >({});
+  // Solo guarda lo que el admin escribio y aun no se persiste. Si un paso no esta
+  // aqui, se muestran los valores del servidor. Recargar la lista nunca pisa esto.
+  const [edits, setEdits] = useState<Record<string, StepEdit>>({});
+  const editsRef = useRef(edits);
+  editsRef.current = edits;
+  const stepsRef = useRef(steps);
+  stepsRef.current = steps;
+
   const [maxSteps, setMaxSteps] = useState(6);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -34,46 +40,132 @@ export function ExperimentStepsField({ experimentId, disabled = false }: Props) 
 
   const base = `/api/admin/experimentos/${experimentId}/pasos`;
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch(base, { cache: "no-store" });
-      const payload = await res.json();
-      if (!res.ok) throw new Error(payload.error ?? "No se pudieron cargar los pasos");
-      const loaded: Step[] = payload.data ?? [];
-      setSteps(loaded);
-      setMaxSteps(payload.maxSteps ?? 6);
-      setEdits(
-        Object.fromEntries(
-          loaded.map((s) => [
-            s.id,
-            { title: s.title, description: s.description, points: String(s.points) }
-          ])
-        )
-      );
-    } catch (err) {
-      setError(getErrorMessage(err));
-    } finally {
-      setLoading(false);
-    }
-  }, [base]);
+  const load = useCallback(
+    async (showSpinner = true) => {
+      if (showSpinner) setLoading(true);
+      try {
+        const res = await fetch(base, { cache: "no-store" });
+        const payload = await res.json();
+        if (!res.ok) throw new Error(payload.error ?? "No se pudieron cargar los pasos");
+        const loaded: Step[] = payload.data ?? [];
+        setSteps(loaded);
+        setMaxSteps(payload.maxSteps ?? 6);
+        // Descarta ediciones de pasos que ya no existen.
+        setEdits((prev) => {
+          const ids = new Set(loaded.map((s) => s.id));
+          return Object.fromEntries(Object.entries(prev).filter(([id]) => ids.has(id)));
+        });
+      } catch (err) {
+        setError(getErrorMessage(err));
+      } finally {
+        setLoading(false);
+      }
+    },
+    [base]
+  );
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  const run = async (action: () => Promise<void>) => {
+  const valuesOf = (step: Step): StepEdit =>
+    edits[step.id] ?? {
+      title: step.title,
+      description: step.description,
+      points: String(step.points)
+    };
+
+  const isDirty = (step: Step, edit: StepEdit) =>
+    edit.title !== step.title ||
+    edit.description !== step.description ||
+    edit.points !== String(step.points);
+
+  const setEdit = (step: Step, patch: Partial<StepEdit>) =>
+    setEdits((prev) => ({
+      ...prev,
+      [step.id]: {
+        ...(prev[step.id] ?? {
+          title: step.title,
+          description: step.description,
+          points: String(step.points)
+        }),
+        ...patch
+      }
+    }));
+
+  // Persiste un paso con lo que hay en pantalla. Lanza error si falla.
+  const persistStep = useCallback(
+    async (step: Step, edit: StepEdit) => {
+      const points = Number(edit.points);
+      if (!Number.isInteger(points) || points < 0 || points > 100) {
+        throw new Error("Los puntos deben ser un entero entre 0 y 100");
+      }
+      const res = await fetch(`${base}/${step.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: edit.title.trim(),
+          description: edit.description.trim(),
+          points
+        })
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(payload.error ?? "No se pudo guardar el paso");
+
+      const saved: Step = {
+        ...step,
+        title: edit.title.trim(),
+        description: edit.description.trim(),
+        points
+      };
+      setSteps((prev) => prev.map((s) => (s.id === step.id ? saved : s)));
+      // Quita la edicion solo si el admin no siguio escribiendo mientras se guardaba.
+      setEdits((prev) => {
+        const current = prev[step.id];
+        if (
+          current &&
+          current.title === edit.title &&
+          current.description === edit.description &&
+          current.points === edit.points
+        ) {
+          const { [step.id]: _removed, ...rest } = prev;
+          void _removed;
+          return rest;
+        }
+        return prev;
+      });
+    },
+    [base]
+  );
+
+  // Guarda todos los pasos con cambios pendientes (antes de agregar/reordenar/borrar).
+  const flushDirty = useCallback(async () => {
+    for (const step of stepsRef.current) {
+      const edit = editsRef.current[step.id];
+      if (edit && isDirty(step, edit)) {
+        await persistStep(step, edit);
+      }
+    }
+  }, [persistStep]);
+
+  const run = async (action: () => Promise<void>, reload = true) => {
     setError(null);
     setBusy(true);
     try {
       await action();
-      await load();
+      if (reload) await load(false);
     } catch (err) {
       setError(getErrorMessage(err));
     } finally {
       setBusy(false);
     }
+  };
+
+  // Guardado al salir del campo: el texto escrito no se pierde aunque no se pulse guardar.
+  const saveOnBlur = (step: Step) => {
+    const edit = editsRef.current[step.id];
+    if (!edit || !isDirty(step, edit) || busy) return;
+    void run(() => persistStep(step, edit), false);
   };
 
   const addStep = () =>
@@ -85,6 +177,7 @@ export function ExperimentStepsField({ experimentId, disabled = false }: Props) 
       if (!Number.isInteger(points) || points < 0) {
         throw new Error("Los puntos deben ser un entero mayor o igual a 0");
       }
+      await flushDirty();
       const res = await fetch(base, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -99,29 +192,10 @@ export function ExperimentStepsField({ experimentId, disabled = false }: Props) 
       setDraft(EMPTY_DRAFT);
     });
 
-  const saveStep = (step: Step) =>
-    run(async () => {
-      const edit = edits[step.id];
-      const points = Number(edit.points);
-      if (!Number.isInteger(points) || points < 0) {
-        throw new Error("Los puntos deben ser un entero mayor o igual a 0");
-      }
-      const res = await fetch(`${base}/${step.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: edit.title.trim(),
-          description: edit.description.trim(),
-          points
-        })
-      });
-      const payload = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(payload.error ?? "No se pudo guardar el paso");
-    });
-
   const moveStep = (index: number, direction: -1 | 1) =>
     run(async () => {
-      const ids = steps.map((s) => s.id);
+      await flushDirty();
+      const ids = stepsRef.current.map((s) => s.id);
       const target = index + direction;
       if (target < 0 || target >= ids.length) return;
       [ids[index], ids[target]] = [ids[target], ids[index]];
@@ -143,6 +217,8 @@ export function ExperimentStepsField({ experimentId, disabled = false }: Props) 
         );
         if (!ok) return;
       }
+      // Guarda lo pendiente de los demas pasos antes de borrar y recargar.
+      await flushDirty();
       const res = await fetch(`${base}/${step.id}?confirm=1`, { method: "DELETE" });
       const payload = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(payload.error ?? "No se pudo eliminar el paso");
@@ -156,8 +232,9 @@ export function ExperimentStepsField({ experimentId, disabled = false }: Props) 
         <p className="text-sm font-semibold text-slate-700">Pasos del alumno (&quot;Tus pasos&quot;)</p>
         <p className="mt-1 text-xs text-slate-500">
           Define los pasos que vera el alumno en este experimento (1 a {maxSteps}). Los
-          puntos de cada paso suman al puntaje del grupo, asi que cambiarlos afecta el
-          ranking. Los cambios se guardan por paso con el boton de guardar.
+          cambios de cada paso se guardan al salir del campo (o con el boton de guardar),
+          sin depender de &quot;Guardar cambios&quot; del experimento. Los puntos suman al
+          puntaje del grupo, asi que cambiarlos afecta el ranking.
         </p>
       </div>
 
@@ -173,17 +250,8 @@ export function ExperimentStepsField({ experimentId, disabled = false }: Props) 
             <li className="text-xs text-slate-500">Aun no hay pasos definidos.</li>
           )}
           {steps.map((step, index) => {
-            const edit = edits[step.id] ?? {
-              title: step.title,
-              description: step.description,
-              points: String(step.points)
-            };
-            const dirty =
-              edit.title !== step.title ||
-              edit.description !== step.description ||
-              edit.points !== String(step.points);
-            const setEdit = (patch: Partial<typeof edit>) =>
-              setEdits((prev) => ({ ...prev, [step.id]: { ...edit, ...patch } }));
+            const edit = valuesOf(step);
+            const dirty = isDirty(step, edit);
             return (
               <li
                 key={step.id}
@@ -196,21 +264,28 @@ export function ExperimentStepsField({ experimentId, disabled = false }: Props) 
                   <input
                     type="text"
                     value={edit.title}
-                    onChange={(e) => setEdit({ title: e.target.value })}
+                    onChange={(e) => setEdit(step, { title: e.target.value })}
+                    onBlur={() => saveOnBlur(step)}
                     maxLength={80}
                     aria-label={`Titulo del paso ${index + 1}`}
-                    disabled={disabled || busy}
+                    disabled={disabled}
                     className={`${inputClass} w-full font-semibold`}
                   />
                   <textarea
                     value={edit.description}
-                    onChange={(e) => setEdit({ description: e.target.value })}
+                    onChange={(e) => setEdit(step, { description: e.target.value })}
+                    onBlur={() => saveOnBlur(step)}
                     maxLength={300}
                     rows={2}
                     aria-label={`Descripcion del paso ${index + 1}`}
-                    disabled={disabled || busy}
+                    disabled={disabled}
                     className={`${inputClass} w-full`}
                   />
+                  {dirty && (
+                    <p className="text-[11px] font-semibold text-amber-600">
+                      Cambios sin guardar
+                    </p>
+                  )}
                   {step.completedCount > 0 && (
                     <p className="text-[11px] text-slate-500">
                       Completado por {step.completedCount} alumno(s)
@@ -225,8 +300,9 @@ export function ExperimentStepsField({ experimentId, disabled = false }: Props) 
                     max={100}
                     step={1}
                     value={edit.points}
-                    onChange={(e) => setEdit({ points: e.target.value })}
-                    disabled={disabled || busy}
+                    onChange={(e) => setEdit(step, { points: e.target.value })}
+                    onBlur={() => saveOnBlur(step)}
+                    disabled={disabled}
                     className={inputClass}
                   />
                 </label>
@@ -234,7 +310,7 @@ export function ExperimentStepsField({ experimentId, disabled = false }: Props) 
                   <button
                     type="button"
                     disabled={disabled || busy || !dirty}
-                    onClick={() => void saveStep(step)}
+                    onClick={() => void run(() => persistStep(step, edit), false)}
                     className="flex h-9 w-9 items-center justify-center rounded-lg text-emerald-700 hover:bg-emerald-50 disabled:opacity-40"
                     aria-label={`Guardar paso ${index + 1}`}
                   >
