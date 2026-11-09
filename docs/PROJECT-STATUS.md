@@ -10,13 +10,12 @@
 - **Rama de trabajo:** `fix/scoring-ajustes-auditoria`
 - **Rama principal:** `main`
 - **Remoto:** `origin` → https://github.com/andres-santana/basura-cero.git
-- **Último commit:** `ae28c06` — chore(kiro): estatus del proyecto, preflight de git y
-  hooks de sesion
+- **Último commit:** `1cd15b8` — docs(status): registro de cierre de sesion (commit + push)
 - **Sincronización:** la rama está al día con `origin/fix/scoring-ajustes-auditoria`
   (commit ya pusheado).
-- **Árbol de trabajo:** el steering, los hooks y este archivo ya están versionados. Siguen
-  sin trackear otros archivos no relacionados (docs varios, scripts, specs); revisar antes
-  de incluirlos para no mezclar trabajo distinto.
+- **Árbol de trabajo:** cambios locales sin commitear en el hook de cierre
+  (`.kiro/hooks/project-status-session-stop.json`) y en este archivo. Siguen sin trackear
+  otros archivos no relacionados (docs varios, scripts, specs).
 
 ## Pendientes / notas
 
@@ -25,6 +24,20 @@
   commit de scoring `8bdfa8f`).
 
 ## Registro de sesiones
+
+### 2026-11-09 — Cierre (hook anti-bucle)
+- Rama: `fix/scoring-ajustes-auditoria`, al día con `origin`, último commit `1cd15b8`.
+- Avances de la sesión: ajustado el prompt del hook de cierre para que solo registre el
+  estado, sin commitear/perseguir su propio commit y sin crear entradas cuyo único cambio
+  sea editar este archivo. Esto rompe el bucle de cierres encadenados.
+- Pendientes: commitear (si se desea) el hook ajustado; decidir si abrir PR hacia `main`.
+
+### 2026-11-09 — Cierre (estatus versionado)
+- Rama: `fix/scoring-ajustes-auditoria`, al día con `origin`, último commit `1cd15b8`.
+- Avances de la sesión: commit `1cd15b8` con el registro de cierre anterior y push al
+  remoto. Árbol limpio salvo archivos no relacionados sin trackear.
+- Pendientes: decidir si abrir PR hacia `main` (incluiría el commit de scoring `8bdfa8f`).
+  Nota: el archivo de estatus queda con un cambio sin commitear tras cada cierre del hook.
 
 ### 2026-11-09 — Cierre (commit + push)
 - Rama: `fix/scoring-ajustes-auditoria`, al día con `origin`, último commit `ae28c06`.
