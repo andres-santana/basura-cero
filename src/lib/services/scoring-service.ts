@@ -196,6 +196,15 @@ export async function recalcGroupSubmissionScore(submissionId: string): Promise<
 
   const daysElapsed = challenge ? computeDaysElapsed(challenge.start_date, row.submitted_at) : 0;
 
+  // Participacion esperada = tamano del grupo (alumnos activos). El bloque de
+  // participacion mide que proporcion del grupo participo, por lo que el
+  // denominador debe ser el total de alumnos, no los participantes reportados
+  // (que, de usarse, darian siempre 100%). Si el grupo no tiene alumnos
+  // registrados, se cae al conteo reportado para no romper el calculo.
+  const activeStudentsCount = await countActiveStudents(row.group_id);
+  const expectedParticipants =
+    activeStudentsCount > 0 ? activeStudentsCount : Math.max(row.participants_count ?? 0, 1);
+
   const progress = challenge
     ? await aggregateStudentProgress(row.group_id, row.challenge_id, challenge.experiment_id)
     : { stepsCompletionRatio: 0, gamesCompletionRatio: 0, studentPointsTotal: 0 };
@@ -209,7 +218,7 @@ export async function recalcGroupSubmissionScore(submissionId: string): Promise<
 
   await scoreSubmission(submissionId, {
     participantsCount: row.participants_count ?? 0,
-    expectedParticipants: Math.max(row.participants_count ?? 0, 1),
+    expectedParticipants,
     kgSeparated: Number(metrics?.kg_separated ?? 0),
     reusedItems: Number(metrics?.reused_items ?? 0),
     recycledItems: Number(metrics?.recycled_items ?? 0),
@@ -237,6 +246,22 @@ export async function recalcGroupSubmissionScore(submissionId: string): Promise<
  * (Fase 2). Determina si el impacto se puntua por kg equivalentes o por el
  * fallback de conteos (Fase 1).
  */
+/**
+ * Cuenta los alumnos activos de un grupo. Se usa como "participacion esperada"
+ * (denominador del bloque de participacion), de modo que el puntaje refleje que
+ * proporcion del grupo participo en el reto.
+ */
+async function countActiveStudents(groupId: string): Promise<number> {
+  const supabase = createServerSupabase();
+  const { count, error } = await supabase
+    .from("students")
+    .select("id", { count: "exact", head: true })
+    .eq("group_id", groupId)
+    .eq("is_active", true);
+  if (error) return 0;
+  return count ?? 0;
+}
+
 async function experimentHasMaterials(experimentId: string): Promise<boolean> {
   const supabase = createServerSupabase();
   const { count, error } = await supabase

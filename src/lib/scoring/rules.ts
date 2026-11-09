@@ -70,11 +70,8 @@ export type BadgeRuleCode =
   | "guardian_reciclaje"
   | "super_separador"
   | "heroe_cero_basura"
-  | "equipo_compostero"
   | "aula_verde"
-  | "reto_cumplido"
-  | "impacto_dorado"
-  | "grupo_eco_lider";
+  | "reto_cumplido";
 
 export type BadgeRule = {
   code: BadgeRuleCode;
@@ -114,12 +111,6 @@ export const badgeRules: BadgeRule[] = [
     evaluate: (input) => input.consecutiveWeeks >= 8
   },
   {
-    code: "equipo_compostero",
-    label: "Equipo Compostero",
-    description: "5 retos de compostaje completados",
-    evaluate: (input) => input.compostWeeks >= 5
-  },
-  {
     code: "aula_verde",
     label: "Aula Verde",
     description: "Participacion promedio >= 85%",
@@ -130,17 +121,8 @@ export const badgeRules: BadgeRule[] = [
     label: "Reto Cumplido",
     description: "Entrega semanal en tiempo",
     evaluate: (input) => input.onTimeSubmissions >= 1
-  },
-  {
-    code: "impacto_dorado",
-    label: "Impacto Dorado",
-    description: "Top 3 mensual",
-    evaluate: (input) => input.isTop3Monthly
-  },
-  {
-    code: "grupo_eco_lider",
-    label: "Grupo Eco-Lider",
-    description: "Top 1 trimestral",
-    evaluate: (input) => input.isTop1Quarterly
   }
+  // NOTA: equipo_compostero, impacto_dorado y grupo_eco_lider se retiraron del
+  // catalogo hasta que exista soporte real para sus condiciones (retos de
+  // compostaje, ranking mensual/trimestral). Ver migracion 031.
 ];
