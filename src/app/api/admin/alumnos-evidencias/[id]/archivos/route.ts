@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { HttpError, jsonError, requireAdminWithSchool } from "@/lib/auth-admin";
 import { createServerSupabase } from "@/lib/supabase/server";
+import { signEvidenceFiles } from "@/lib/supabase/evidence-urls";
 
 const BUCKET = "evidencias";
 const EXPIRES_IN_SECONDS = 600;
@@ -29,28 +30,22 @@ export async function GET(
       throw new HttpError(404, "Evidencia no encontrada");
     }
 
-    const files = submission.student_evidence_files ?? [];
-    if (!files.length) return NextResponse.json({ data: [] });
+    const rawFiles = submission.student_evidence_files ?? [];
+    if (!rawFiles.length) return NextResponse.json({ data: [] });
 
-    const { data: signed, error } = await supabase.storage
-      .from(BUCKET)
-      .createSignedUrls(
-        files.map((f) => f.file_path),
-        EXPIRES_IN_SECONDS
-      );
-    if (error) throw error;
-
-    const byPath = new Map<string, string>();
-    (signed ?? []).forEach((entry) => {
-      if (entry.path && entry.signedUrl) byPath.set(entry.path, entry.signedUrl);
-    });
+    const signed = await signEvidenceFiles(
+      supabase,
+      BUCKET,
+      rawFiles.map((f) => ({ id: f.id, path: f.file_path, type: f.file_type })),
+      EXPIRES_IN_SECONDS
+    );
 
     return NextResponse.json({
-      data: files.map((f) => ({
+      data: signed.map((f) => ({
         id: f.id,
-        path: f.file_path,
-        type: f.file_type,
-        signedUrl: byPath.get(f.file_path) ?? null
+        path: f.path,
+        type: f.type,
+        signedUrl: f.signedUrl
       })),
       expiresInSeconds: EXPIRES_IN_SECONDS
     });
