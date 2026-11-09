@@ -23,6 +23,9 @@
 # local backups
 /docs/backups/
 
+# generated manuals (binarios regenerables con scripts/generar-*.mjs)
+/docs/manuales/
+
 # debug
 npm-debug.log*
 yarn-debug.log*
