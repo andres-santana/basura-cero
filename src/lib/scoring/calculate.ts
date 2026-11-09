@@ -85,8 +85,6 @@ export function calculateScore(
   const recyclePoints = usesCatalog
     ? 0
     : clamp(metrics.recycledItems ?? 0, 0, weights.recycledItemsMax);
-  const creativityPoints = clamp(metrics.creativityScore, 0, weights.creativityMax);
-  const teamworkPoints = clamp(metrics.teamworkScore, 0, weights.teamworkMax);
   const experimentPoints = weights.experimentCompleted;
   const evidencePoints = metrics.hasEvidenceFile ? weights.evidenceComplete : 0;
 
@@ -104,9 +102,7 @@ export function calculateScore(
     equivalentKgPoints +
     wasteReductionPoints +
     reusePoints +
-    recyclePoints +
-    creativityPoints +
-    teamworkPoints;
+    recyclePoints;
 
   // Factor por tiempo de respuesta (dias desde el inicio del reto). Solo aplica
   // al puntaje base del grupo (tope 100).
@@ -131,12 +127,13 @@ export function calculateScore(
       games: gamesPoints,
       participation: participationPoints,
       equivalentKg: equivalentKgPoints,
+      // wasteReduction puntua los KG SEPARADOS reportados (0.5 pt/kg, tope
+      // wasteReductionMax). El nombre es historico; no usa
+      // waste_reduced_estimate.
       wasteReduction: wasteReductionPoints,
       reusedItems: reusePoints,
       recycledItems: recyclePoints,
       usesMaterialCatalog: usesCatalog ? 1 : 0,
-      creativity: creativityPoints,
-      teamwork: teamworkPoints,
       subtotal,
       daysElapsed,
       timeFactor: factor,
