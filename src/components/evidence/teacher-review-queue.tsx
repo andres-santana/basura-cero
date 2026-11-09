@@ -405,6 +405,8 @@ export function TeacherReviewQueue() {
                                 <img
                                   src={f.signedUrl}
                                   alt="Evidencia del alumno"
+                                  loading="lazy"
+                                  decoding="async"
                                   className="h-40 w-full object-cover"
                                 />
                               </button>

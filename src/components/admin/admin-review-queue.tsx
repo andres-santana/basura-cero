@@ -319,6 +319,8 @@ export function AdminReviewQueue() {
                                   <img
                                     src={f.signedUrl}
                                     alt="Evidencia"
+                                    loading="lazy"
+                                    decoding="async"
                                     className="h-40 w-full object-cover"
                                   />
                                 </button>

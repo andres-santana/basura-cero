@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { HttpError, jsonError } from "@/lib/auth-admin";
 import { assertGroupOwnership, requireTeacherWithSchool } from "@/lib/auth-teacher";
 import { createServerSupabase } from "@/lib/supabase/server";
+import { signEvidenceFiles } from "@/lib/supabase/evidence-urls";
 
 const BUCKET = "evidencias";
 const EXPIRES_IN_SECONDS = 600;
@@ -67,26 +68,20 @@ export async function GET(
 
     if (!files.length) return NextResponse.json({ data: [] });
 
-    const { data: signed, error: signError } = await supabase.storage
-      .from(BUCKET)
-      .createSignedUrls(
-        files.map((f) => f.path),
-        EXPIRES_IN_SECONDS
-      );
-    if (signError) throw signError;
-
-    const byPath = new Map<string, string>();
-    (signed ?? []).forEach((entry) => {
-      if (entry.path && entry.signedUrl) byPath.set(entry.path, entry.signedUrl);
-    });
+    const signed = await signEvidenceFiles(
+      supabase,
+      BUCKET,
+      files,
+      EXPIRES_IN_SECONDS
+    );
 
     return NextResponse.json({
-      data: files.map((f) => ({
+      data: signed.map((f) => ({
         id: f.id,
         path: f.path,
         type: f.type,
         studentAlias: f.studentAlias,
-        signedUrl: byPath.get(f.path) ?? null
+        signedUrl: f.signedUrl
       })),
       expiresInSeconds: EXPIRES_IN_SECONDS
     });

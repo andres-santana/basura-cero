@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Camera, CheckCircle2, Loader2, Trash2, Upload } from "lucide-react";
 import { getErrorMessage } from "@/lib/error-message";
+import { compressImage } from "@/lib/image/compress";
 import { supabaseClient } from "@/lib/supabase/client";
 import { Mascot } from "@/components/students/mascot";
 import { Confetti } from "@/components/students/confetti";
@@ -118,7 +119,9 @@ export function StudentEvidenceUploader() {
     try {
       const uploaded: Array<{ path: string; type: string }> = [];
       for (let i = 0; i < files.length; i += 1) {
-        const file = files[i];
+        setProgress(`Optimizando ${i + 1} de ${files.length}`);
+        const file = await compressImage(files[i]);
+        const contentType = file.type || "application/octet-stream";
         setProgress(`Subiendo ${i + 1} de ${files.length}`);
         const signRes = await fetch("/api/alumno/storage/upload-url", {
           method: "POST",
@@ -130,10 +133,10 @@ export function StudentEvidenceUploader() {
         const { error: upErr } = await supabaseClient.storage
           .from(signPayload.bucket)
           .uploadToSignedUrl(signPayload.path, signPayload.token, file, {
-            contentType: file.type || "application/octet-stream"
+            contentType
           });
         if (upErr) throw new Error(upErr.message);
-        uploaded.push({ path: signPayload.path, type: file.type || "application/octet-stream" });
+        uploaded.push({ path: signPayload.path, type: contentType });
       }
 
       setProgress("Guardando...");
