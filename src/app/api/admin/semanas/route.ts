@@ -76,6 +76,22 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Experimento no existe" }, { status: 400 });
     }
 
+    // Cada experimento debe usarse una sola vez por escuela: evita retos/semanas
+    // duplicados que dupliquen la puntuacion en el ranking.
+    const { data: existing, error: existingErr } = await supabase
+      .from("weekly_challenges")
+      .select("id")
+      .eq("school_id", session.schoolId)
+      .eq("experiment_id", parsed.data.experimentId)
+      .maybeSingle();
+    if (existingErr) throw existingErr;
+    if (existing) {
+      return NextResponse.json(
+        { error: "Este experimento ya tiene una semana programada en tu escuela" },
+        { status: 409 }
+      );
+    }
+
     if (parsed.data.activateNow) {
       const { error: clearError } = await supabase
         .from("weekly_challenges")
@@ -97,6 +113,15 @@ export async function POST(request: Request) {
       .select("id")
       .single();
     if (insertError) {
+      // Red de seguridad ante una condicion de carrera: el indice unico
+      // (school_id, experiment_id) puede disparar 23505 aunque la verificacion
+      // previa haya pasado.
+      if ((insertError as { code?: string }).code === "23505") {
+        return NextResponse.json(
+          { error: "Este experimento ya tiene una semana programada en tu escuela" },
+          { status: 409 }
+        );
+      }
       return NextResponse.json({ error: insertError.message }, { status: 500 });
     }
 
