@@ -10,21 +10,29 @@
 - **Rama de trabajo:** `fix/scoring-ajustes-auditoria`
 - **Rama principal:** `main`
 - **Remoto:** `origin` → https://github.com/andres-santana/basura-cero.git
-- **Último commit:** `8bdfa8f` — fix(scoring): participacion por tamano de grupo, retira
-  badges sin soporte y limpia breakdown
-- **Sincronización:** la rama está al día con `origin/fix/scoring-ajustes-auditoria`.
-- **Árbol de trabajo:** hay archivos sin trackear pendientes (docs, scripts, `.kiro/`
-  —incluidos el nuevo `.kiro/steering/`, `.kiro/hooks/` y `docs/PROJECT-STATUS.md`—).
-  Revisar antes de commitear para no mezclar trabajo no relacionado.
+- **Último commit:** `ae28c06` — chore(kiro): estatus del proyecto, preflight de git y
+  hooks de sesion
+- **Sincronización:** la rama está al día con `origin/fix/scoring-ajustes-auditoria`
+  (commit ya pusheado).
+- **Árbol de trabajo:** el steering, los hooks y este archivo ya están versionados. Siguen
+  sin trackear otros archivos no relacionados (docs varios, scripts, specs); revisar antes
+  de incluirlos para no mezclar trabajo distinto.
 
 ## Pendientes / notas
 
 - Definir qué archivos sin trackear deben entrar al control de versiones y cuáles no.
-- Agregar al control de versiones (en una rama de trabajo) el steering, los hooks y este
-  archivo de estatus, siguiendo el flujo de git acordado.
-- Al terminar el trabajo de scoring, cerrar el ciclo con commit → push → PR hacia `main`.
+- Opcional: abrir PR de `fix/scoring-ajustes-auditoria` hacia `main` (abarca también el
+  commit de scoring `8bdfa8f`).
 
 ## Registro de sesiones
+
+### 2026-11-09 — Cierre (commit + push)
+- Rama: `fix/scoring-ajustes-auditoria`, al día con `origin`, último commit `ae28c06`.
+- Avances de la sesión:
+  - Commit `ae28c06` con los 6 archivos nuevos (2 hooks, 3 de steering,
+    `docs/PROJECT-STATUS.md`) y push a `origin/fix/scoring-ajustes-auditoria`.
+  - Se dejaron fuera a propósito los demás archivos sin trackear (no relacionados).
+- Pendientes: decidir si abrir PR hacia `main` (incluiría el commit de scoring `8bdfa8f`).
 
 ### 2026-11-09 — Cierre
 - Rama: `fix/scoring-ajustes-auditoria` (al día con `origin`, último commit `8bdfa8f`).
