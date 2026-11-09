@@ -32,6 +32,19 @@ export type SubmissionMetrics = {
    * presupuesto de 100 y sin aplicarle el factor de tiempo.
    */
   studentPointsTotal?: number;
+  /**
+   * Kg equivalentes del grupo (Fase 2), derivados de las cantidades por
+   * material × su peso. Solo se usan para el puntaje de impacto cuando
+   * usesMaterialCatalog es true.
+   */
+  equivalentKg?: number;
+  /**
+   * true si el experimento tiene catalogo de materiales. En ese caso el
+   * impacto se puntua sobre equivalentKg y los conteos sueltos (kg/reutilizados/
+   * reciclados) NO suman puntos (se evita el doble conteo). Sin catalogo, se usa
+   * el comportamiento de Fase 1.
+   */
+  usesMaterialCatalog?: boolean;
 };
 
 export type ScoreResult = {
@@ -53,15 +66,25 @@ export function calculateScore(
       : 0;
 
   const participationPoints = clamp(Math.round(participationPct / 10), 0, weights.participationMax);
-  // Impacto por kg separados: medio punto por kg (0.5 pt/kg) para un gradiente
-  // mas fino que el "floor" plano anterior, hasta el tope del peso.
-  const wasteReductionPoints = clamp(
-    Math.round(metrics.kgSeparated * 0.5 * 10) / 10,
-    0,
-    weights.wasteReductionMax
-  );
-  const reusePoints = clamp(metrics.reusedItems, 0, weights.reusedItemsMax);
-  const recyclePoints = clamp(metrics.recycledItems ?? 0, 0, weights.recycledItemsMax);
+
+  // Bloque de IMPACTO. Dos modos:
+  // - Con catalogo de materiales (Fase 2): se puntua sobre kg equivalentes
+  //   (0.5 pt/kg eq, hasta equivalentKgMax). Los conteos sueltos NO suman
+  //   puntos para no contar doble.
+  // - Sin catalogo (fallback Fase 1): kg separados (0.5 pt/kg) + reutilizados
+  //   + reciclados, cada uno con su tope.
+  const usesCatalog = metrics.usesMaterialCatalog === true;
+
+  const equivalentKgPoints = usesCatalog
+    ? clamp(Math.round((metrics.equivalentKg ?? 0) * 0.5 * 10) / 10, 0, weights.equivalentKgMax)
+    : 0;
+  const wasteReductionPoints = usesCatalog
+    ? 0
+    : clamp(Math.round(metrics.kgSeparated * 0.5 * 10) / 10, 0, weights.wasteReductionMax);
+  const reusePoints = usesCatalog ? 0 : clamp(metrics.reusedItems, 0, weights.reusedItemsMax);
+  const recyclePoints = usesCatalog
+    ? 0
+    : clamp(metrics.recycledItems ?? 0, 0, weights.recycledItemsMax);
   const creativityPoints = clamp(metrics.creativityScore, 0, weights.creativityMax);
   const teamworkPoints = clamp(metrics.teamworkScore, 0, weights.teamworkMax);
   const experimentPoints = weights.experimentCompleted;
@@ -78,6 +101,7 @@ export function calculateScore(
     stepsPoints +
     gamesPoints +
     participationPoints +
+    equivalentKgPoints +
     wasteReductionPoints +
     reusePoints +
     recyclePoints +
@@ -106,9 +130,11 @@ export function calculateScore(
       steps: stepsPoints,
       games: gamesPoints,
       participation: participationPoints,
+      equivalentKg: equivalentKgPoints,
       wasteReduction: wasteReductionPoints,
       reusedItems: reusePoints,
       recycledItems: recyclePoints,
+      usesMaterialCatalog: usesCatalog ? 1 : 0,
       creativity: creativityPoints,
       teamwork: teamworkPoints,
       subtotal,

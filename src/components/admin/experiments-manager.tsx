@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ExperimentVideoField } from "@/components/admin/experiment-video-field";
+import { ExperimentMaterialsField } from "@/components/admin/experiment-materials-field";
 import {
   CHALLENGE_TYPES,
   CHALLENGE_TYPE_STYLES,
@@ -579,6 +580,10 @@ export function ExperimentsManager() {
                         current ? { ...current, videoUrl } : current
                       )
                     }
+                    disabled={submitting}
+                  />
+                  <ExperimentMaterialsField
+                    experimentId={experiment.id}
                     disabled={submitting}
                   />
                   <div className="flex flex-wrap gap-2">

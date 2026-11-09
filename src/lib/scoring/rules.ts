@@ -7,6 +7,13 @@ export type ScoreWeights = {
   wasteReductionMax: number;
   reusedItemsMax: number;
   recycledItemsMax: number;
+  /**
+   * Tope del bloque de impacto por KG EQUIVALENTES (Fase 2), usado cuando el
+   * experimento tiene catalogo de materiales. Reemplaza el presupuesto de los
+   * tres conteos (waste/reused/recycled = 30) para que el total base siga
+   * sumando 100 con o sin catalogo.
+   */
+  equivalentKgMax: number;
   creativityMax: number;
   teamworkMax: number;
 };
@@ -29,6 +36,7 @@ export const defaultScoreWeights: ScoreWeights = {
   wasteReductionMax: 10,
   reusedItemsMax: 10,
   recycledItemsMax: 10,
+  equivalentKgMax: 30,
   creativityMax: 0,
   teamworkMax: 0
 };

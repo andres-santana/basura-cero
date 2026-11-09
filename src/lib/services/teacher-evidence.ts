@@ -48,6 +48,9 @@ type StudentSubmissionRow = {
   reused_items: number | null;
   recycled_items: number | null;
   student_evidence_files: { id: string }[] | null;
+  student_submission_materials:
+    | { quantity: number | null; experiment_materials: { kg_per_unit: number } | { kg_per_unit: number }[] | null }[]
+    | null;
   groups:
     | { name: string | null; grade: string | null; school_id: string; teachers: { user_id: string } | { user_id: string }[] | null }
     | { name: string | null; grade: string | null; school_id: string; teachers: { user_id: string } | { user_id: string }[] | null }[]
@@ -78,6 +81,8 @@ type DerivedAggregate = {
   kgSeparated: number;
   reusedItems: number;
   recycledItems: number;
+  /** Kg equivalentes derivados de las cantidades por material (Fase 2). */
+  equivalentKg: number;
   filesCount: number;
   /** submitted_at mas reciente entre las evidencias de alumnos. */
   latestSubmittedAt: string | null;
@@ -111,6 +116,7 @@ function aggregateStudentRows(rows: StudentSubmissionRow[]): Map<DerivedKey, Der
         kgSeparated: 0,
         reusedItems: 0,
         recycledItems: 0,
+        equivalentKg: 0,
         filesCount: 0,
         latestSubmittedAt: null
       } satisfies DerivedAggregate);
@@ -123,6 +129,15 @@ function aggregateStudentRows(rows: StudentSubmissionRow[]): Map<DerivedKey, Der
       existing.kgSeparated += Number(row.kg_separated ?? 0);
       existing.reusedItems += Number(row.reused_items ?? 0);
       existing.recycledItems += Number(row.recycled_items ?? 0);
+
+      const matRows = row.student_submission_materials;
+      if (Array.isArray(matRows)) {
+        for (const mr of matRows) {
+          const material = pickOne(mr.experiment_materials);
+          existing.equivalentKg +=
+            Number(mr.quantity ?? 0) * Number(material?.kg_per_unit ?? 0);
+        }
+      }
     }
     existing.filesCount += Array.isArray(row.student_evidence_files)
       ? row.student_evidence_files.length
@@ -135,6 +150,11 @@ function aggregateStudentRows(rows: StudentSubmissionRow[]): Map<DerivedKey, Der
     }
 
     map.set(key, existing);
+  }
+
+  // Redondea los kg equivalentes acumulados para evitar ruido de punto flotante.
+  for (const agg of map.values()) {
+    agg.equivalentKg = Math.round(agg.equivalentKg * 100) / 100;
   }
 
   return map;
@@ -158,6 +178,7 @@ export async function ensureGroupSubmissionsFromStudents(
     .select(
       `id, challenge_id, group_id, status, submitted_at, kg_separated, reused_items, recycled_items,
        student_evidence_files(id),
+       student_submission_materials(quantity, experiment_materials(kg_per_unit)),
        groups!inner(name, grade, school_id, teachers(user_id)),
        weekly_challenges(end_date, experiments(week_number, title))`
     )
@@ -266,6 +287,7 @@ export async function ensureGroupSubmissionsFromStudents(
         kg_separated: agg.kgSeparated,
         reused_items: agg.reusedItems,
         recycled_items: agg.recycledItems,
+        equivalent_kg: agg.equivalentKg,
         waste_reduced_estimate: agg.kgSeparated
       },
       { onConflict: "submission_id" }
@@ -371,7 +393,9 @@ export async function syncGroupMetricsFromStudents(
 
   const { data: studentRows } = await supabase
     .from("student_submissions")
-    .select("status, kg_separated, reused_items, recycled_items")
+    .select(
+      "id, status, kg_separated, reused_items, recycled_items, student_submission_materials(quantity, experiment_materials(kg_per_unit))"
+    )
     .eq("group_id", groupId)
     .eq("challenge_id", challengeId);
 
@@ -379,14 +403,30 @@ export async function syncGroupMetricsFromStudents(
   let kg = 0;
   let reused = 0;
   let recycled = 0;
+  let equivalentKg = 0;
   for (const row of studentRows ?? []) {
     if (row.status === "submitted" || row.status === "approved") {
       participants += 1;
       kg += Number(row.kg_separated ?? 0);
       reused += Number(row.reused_items ?? 0);
       recycled += Number(row.recycled_items ?? 0);
+
+      // Kg equivalentes (Fase 2): suma de cantidad × peso por unidad de cada
+      // material reportado por el alumno.
+      const matRows = (row as {
+        student_submission_materials?:
+          | { quantity: number | null; experiment_materials: { kg_per_unit: number } | { kg_per_unit: number }[] | null }[]
+          | null;
+      }).student_submission_materials;
+      if (Array.isArray(matRows)) {
+        for (const mr of matRows) {
+          const material = pickOne(mr.experiment_materials);
+          equivalentKg += Number(mr.quantity ?? 0) * Number(material?.kg_per_unit ?? 0);
+        }
+      }
     }
   }
+  equivalentKg = Math.round(equivalentKg * 100) / 100;
 
   const teacherLocked = groupSub.status === "approved" || groupSub.status === "rejected";
 
@@ -404,6 +444,7 @@ export async function syncGroupMetricsFromStudents(
         kg_separated: kg,
         reused_items: reused,
         recycled_items: recycled,
+        equivalent_kg: equivalentKg,
         waste_reduced_estimate: kg
       },
       { onConflict: "submission_id" }
