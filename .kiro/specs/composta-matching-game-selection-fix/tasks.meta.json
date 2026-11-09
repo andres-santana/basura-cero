@@ -1,0 +1,89 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1. Observe the ambiguous card states on the UNFIXED code (bug condition check)": [
+      {
+        "executionId": "902016b0-41cd-4759-ac9a-52a3fffafdb6",
+        "chatSessionId": "sess_6552a6db-d706-42fa-a65b-ff164939af84",
+        "timestamp": 1791901289418
+      },
+      {
+        "executionId": "902016b0-41cd-4759-ac9a-52a3fffafdb6",
+        "chatSessionId": "sess_6552a6db-d706-42fa-a65b-ff164939af84",
+        "timestamp": 1791901339008
+      }
+    ],
+    "2. Record baseline interactive behavior on the UNFIXED code (preservation check)": [
+      {
+        "executionId": "05350eff-47b4-4da5-91c1-cfa7c42b72f5",
+        "chatSessionId": "sess_206ebab7-acb1-4938-bfa3-d49362bee843",
+        "timestamp": 1791999431326
+      },
+      {
+        "executionId": "05350eff-47b4-4da5-91c1-cfa7c42b72f5",
+        "chatSessionId": "sess_206ebab7-acb1-4938-bfa3-d49362bee843",
+        "timestamp": 1791999477168
+      }
+    ],
+    "3. Fix the ambiguous card styling in MiniGame": [
+      {
+        "executionId": "95470a8d-a03f-471e-94dd-7fd71891caf5",
+        "chatSessionId": "sess_53a34f28-e2d7-4318-9d12-242ddda82c5d",
+        "timestamp": 1791999664624
+      },
+      {
+        "executionId": "95470a8d-a03f-471e-94dd-7fd71891caf5",
+        "chatSessionId": "sess_53a34f28-e2d7-4318-9d12-242ddda82c5d",
+        "timestamp": 1791999734077
+      }
+    ],
+    "3.1 Rework the conditional className strings for the card buttons": [
+      {
+        "executionId": "9856c5ec-03a2-41bf-b3a3-a0099462aea2",
+        "chatSessionId": "sess_a18b9f85-caed-4f2f-9fc9-110e20763a11",
+        "timestamp": 1791999905231
+      },
+      {
+        "executionId": "9856c5ec-03a2-41bf-b3a3-a0099462aea2",
+        "chatSessionId": "sess_a18b9f85-caed-4f2f-9fc9-110e20763a11",
+        "timestamp": 1792000013590
+      }
+    ],
+    "3.2 Verify the three card states are now visually distinct": [
+      {
+        "executionId": "67a82e10-4305-4b2c-a811-e22ee7daf7ca",
+        "chatSessionId": "sess_09a6506f-588d-4022-8a3f-a262d75adb22",
+        "timestamp": 1792000759901
+      },
+      {
+        "executionId": "67a82e10-4305-4b2c-a811-e22ee7daf7ca",
+        "chatSessionId": "sess_09a6506f-588d-4022-8a3f-a262d75adb22",
+        "timestamp": 1792000814782
+      }
+    ],
+    "3.3 Verify interactive behavior is unchanged": [
+      {
+        "executionId": "936840c1-f809-484e-ad66-46e77179bcb6",
+        "chatSessionId": "sess_90dc3489-9bf2-4c5f-b14e-58c02efa1c3b",
+        "timestamp": 1792003891692
+      },
+      {
+        "executionId": "936840c1-f809-484e-ad66-46e77179bcb6",
+        "chatSessionId": "sess_90dc3489-9bf2-4c5f-b14e-58c02efa1c3b",
+        "timestamp": 1792004008889
+      }
+    ],
+    "4. Checkpoint - Verify the build and lint pass": [
+      {
+        "executionId": "b90e3177-0422-40ef-a911-5028c57ff972",
+        "chatSessionId": "sess_a863494a-38b0-49d2-807e-1ff26aa0ef2e",
+        "timestamp": 1792004027551
+      },
+      {
+        "executionId": "b90e3177-0422-40ef-a911-5028c57ff972",
+        "chatSessionId": "sess_a863494a-38b0-49d2-807e-1ff26aa0ef2e",
+        "timestamp": 1792004112786
+      }
+    ]
+  }
+}
