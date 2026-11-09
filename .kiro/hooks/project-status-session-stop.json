@@ -1,0 +1,13 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Actualizar estatus al cerrar sesión",
+      "trigger": "Stop",
+      "action": {
+        "type": "agent",
+        "prompt": "Antes de terminar, actualiza el archivo docs/PROJECT-STATUS.md con el estado de cierre de la sesión. Ejecuta `git status`, `git branch --show-current` y `git log --oneline -1` para conocer el estado real. Actualiza la sección \"Resumen actual\" y agrega una entrada al inicio de \"Registro de sesiones\" con el formato \"### AAAA-MM-DD — Cierre\", resumiendo qué se avanzó en la sesión y qué queda pendiente. Mantén el archivo conciso y veraz; no inventes avances que no ocurrieron. IMPORTANTE: limítate a registrar el estado; NO hagas commit ni push de este archivo ni intentes reflejar/perseguir su propio commit. Editar docs/PROJECT-STATUS.md NO cuenta como un avance que deba registrarse: no generes entradas cuyo único contenido sea la actualización de este archivo de estatus. Si el único cambio desde el último cierre fue actualizar este archivo, no agregues una entrada nueva."
+      }
+    }
+  ]
+}
