@@ -1,0 +1,13 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Actualizar estatus al abrir sesión",
+      "trigger": "SessionStart",
+      "action": {
+        "type": "agent",
+        "prompt": "Al inicio de esta sesión, actualiza el archivo docs/PROJECT-STATUS.md. Ejecuta `git status`, `git branch --show-current`, `git log --oneline -1` y `git fetch origin` para conocer el estado real del repositorio. Luego actualiza la sección \"Resumen actual\" (rama, último commit, sincronización, estado del árbol) y agrega una entrada nueva al inicio de \"Registro de sesiones\" con el formato \"### AAAA-MM-DD — Apertura\", describiendo el estado encontrado. No mezcles esto con otros cambios de código; es solo mantenimiento del estatus."
+      }
+    }
+  ]
+}
